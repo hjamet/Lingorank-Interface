@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "lingorank-interface"
+version = "0.1.0"
+description = "Dash interface for presenting difficulty estimation and simplification results for French texts"
+authors = ["Henri Jamet <henri.jamet@unil.ch>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.9.13"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
