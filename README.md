@@ -49,6 +49,7 @@ The project is divided into several directories:
 ```
 .
 ├── src # Contains the source code of the project
+├── tests # Contains the tests of the project
 ```
 
 ### Convention 🦦
