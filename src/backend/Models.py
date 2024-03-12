@@ -13,6 +13,9 @@ from transformers import (
 from datasets import Dataset
 import pandas as pd
 import logging
+import torch
+from tqdm import tqdm as console_tqdm
+from torch.utils.data import DataLoader
 
 
 class Models:
@@ -66,30 +69,14 @@ class Models:
         config = PeftConfig.from_pretrained(
             "OloriBern/Mistral-7B-French-Simplification"
         )
-        mistral_model = AutoModelForCausalLM.from_pretrained(**kwargs)
-        mistral_model = PeftModel.from_pretrained(
-            mistral_model,
+        self.mistral_model = AutoModelForCausalLM.from_pretrained(**kwargs)
+        self.mistral_model = PeftModel.from_pretrained(
+            self.mistral_model,
             "OloriBern/Mistral-7B-French-Simplification",
             config=config,
         )
         ## Load Tokenizer
-        self.mistral_tokenizer = AutoTokenizer.from_pretrained(
-            "bofenghuang/vigostral-7b-chat",
-            padding_side="left",
-            truncation_side="left",
-            add_eos_token=False,
-            add_bos_token=True,
-            trust_remote_code=True,
-        )
-        self.mistral_tokenizer.pad_token = self.mistral_tokenizer.eos_token
-        ## Create pipeline
-        self.simplification_pipeline = pipeline(
-            "text-generation",
-            model=mistral_model,
-            tokenizer=self.mistral_tokenizer,
-            torch_dtype=torch.bfloat16,
-            device_map="cpu",
-        )
+        self.mistral_tokenizer = self.__download_tokenizer()
 
         print("Models loaded successfully.")
 
@@ -123,18 +110,60 @@ class Models:
             List[str]: The simplified sentences.
         """
         # TODO: check if I am well using my mistral and not vigostral, because results are not good
+        # Estimate difficulty
         inputs = pd.DataFrame(columns=["Sentence", "Difficulty"])
         inputs["Sentence"] = sentences
         inputs["Difficulty"] = pd.Series(self.compute_sentences_difficulty(sentences))
-        inputs = self.__format_data_mistral(inputs)["formatted_chat"]
-        predictions = self.simplification_pipeline(
-            sentences, max_new_tokens=2 * max(map(len, inputs))
+
+        # Format data
+        inputs = self.__format_data_mistral(inputs)
+
+        # Encode dataset
+        encoded_dataset = self.__encode_dataset(inputs, self.mistral_tokenizer)
+
+        # Simplify sentences
+        test_loader = DataLoader(encoded_dataset, batch_size=16)
+
+        # Generate predictions
+        with torch.no_grad():
+            self.mistral_model.eval()
+            predictions_ids = []
+
+            for batch in console_tqdm(test_loader):
+                input_ids_batch = batch["input_ids"].to("cpu")
+                attention_mask_batch = batch["attention_mask"].to("cpu")
+
+                outputs = self.mistral_model.generate(
+                    input_ids=input_ids_batch,
+                    attention_mask=attention_mask_batch,
+                    max_length=max(128, input_ids_batch.shape[1] * 2),
+                    num_return_sequences=1,
+                )
+
+                predictions_ids.extend(outputs)
+            predictions = [
+                self.mistral_tokenizer.decode(prediction, skip_special_tokens=True)
+                for prediction in predictions_ids
+            ]
+            predictions_series = pd.Series(predictions)
+
+        return predictions_series
+
+    def __download_tokenizer(
+        self, model_name: str = "bofenghuang/vigostral-7b-chat", training: bool = False
+    ):
+        # Download tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            padding_side="left",
+            truncation_side="left",
+            add_eos_token=training,
+            add_bos_token=True,
+            trust_remote_code=True,
         )
-        # TODO: sentences generated are too long
-        generated_sentences = [
-            prediction[0]["generated_text"] for prediction in predictions
-        ]
-        return generated_sentences
+        tokenizer.pad_token = tokenizer.eos_token
+
+        return tokenizer
 
     def __format_data_mistral(
         self,
@@ -195,6 +224,58 @@ class Models:
         )
 
         return formatted_dataset
+
+    def __encode_dataset(self, dataset: Dataset, tokenizer: AutoTokenizer):
+        # Determine max length
+        logging.info("Determine max length...")
+        max_length = max(
+            [
+                len(tokenizer.encode(chat))
+                for chat in console_tqdm(dataset["formatted_chat"])
+            ]
+        )
+
+        # Encode dataset
+        logging.info("Encode dataset...")
+        encoded_dataset = dataset.map(
+            lambda x: tokenizer(
+                x["formatted_chat"],
+                padding="max_length",
+                truncation=True,
+                max_length=max_length,
+                return_attention_mask=True,
+            ),
+            batched=True,
+        )
+
+        # Create labels
+        logging.info("Create labels...")
+        encoded_dataset = encoded_dataset.map(
+            lambda x: {
+                "labels": x["input_ids"],
+                "input_ids": x["input_ids"],
+                "attention_mask": x["attention_mask"],
+            },
+            batched=True,
+        )
+
+        # Create dataset ready for training
+        logging.info("Create dataset ready for training...")
+        encoded_dataset = Dataset.from_dict(
+            {
+                "input_ids": torch.tensor(encoded_dataset["input_ids"]),
+                "attention_mask": torch.tensor(encoded_dataset["attention_mask"]),
+                "labels": torch.tensor(encoded_dataset["labels"]),
+            }
+        )
+
+        # Set format
+        encoded_dataset.set_format(
+            type="torch",
+            columns=["input_ids", "attention_mask", "labels"],
+        )
+
+        return encoded_dataset
 
 
 if __name__ == "__main__":
