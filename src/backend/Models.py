@@ -34,17 +34,18 @@ class Models:
         )
 
         # Load the sentence simplification model
-        # TODO cpu must be used for the model
+        # TODO Acheter DDR5 30GO -> 64GO
         config = PeftConfig.from_pretrained(
             "OloriBern/Mistral-7B-French-Simplification"
         )
         model = AutoModelForCausalLM.from_pretrained(
             "bofenghuang/vigostral-7b-chat",
-            device_map="auto",
             trust_remote_code=True,
         )
         model = PeftModel.from_pretrained(
-            model, "OloriBern/Mistral-7B-French-Simplification", config=config
+            model,
+            "OloriBern/Mistral-7B-French-Simplification",
+            config=config,
         )
 
         print("Models loaded successfully.")
