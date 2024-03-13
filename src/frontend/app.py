@@ -36,9 +36,28 @@ class App:
             str: The layout of the app.
         """
         # Empty layout
-        layout = dmc.Container()
+        layout = dmc.Container(
+            children=[],
+        )
 
-        # TODO - Add button to add url
+        # Title
+        title = dmc.Text(children="Lingorank Demo", size="xl", weight=700)
+
+        # Add url button
+        add_url_button = dmc.Button(
+            children="Add URL",
+            color="blue",
+        )
+
+        # Top bar
+        top_bar = dmc.SimpleGrid(
+            cols="1",
+            spacing="lg",
+            children=[title, add_url_button],
+        )
+
+        # Add the top bar to the layout
+        layout.children.append(top_bar)
 
         # Return the layout
         return layout
