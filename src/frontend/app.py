@@ -40,8 +40,13 @@ class App:
             children=[],
         )
 
-        # Title
-        title = dmc.Text(children="Lingorank Demo", size="xl", weight=700)
+        # Title of the app (underlined)
+        title = dmc.Title(
+            children="Lingorank Demo",
+            order=1,
+            align="center",
+            style={"textDecoration": "underline"},
+        )
 
         # Add url button
         add_url_button = dmc.Button(
