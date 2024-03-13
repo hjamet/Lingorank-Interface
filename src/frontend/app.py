@@ -19,6 +19,12 @@ class App:
         # Set the layout
         self.dash_app.layout = self.__get_layout()
 
+        # Add callbacks
+        self.dash_app.callback(
+            dash.dependencies.Output("layout", "children"),
+            dash.dependencies.Input("add-url-button", "n_clicks"),
+        )(self.__callback_add_url)
+
     def __call__(self, debug: bool = False, port: int = 5000):
         """Run the server
 
@@ -36,9 +42,7 @@ class App:
             str: The layout of the app.
         """
         # Empty layout
-        layout = dmc.Container(
-            children=[],
-        )
+        layout = dmc.Container(children=[], id="layout", size="100%")
 
         # Title of the app (underlined)
         title = dmc.Title(
@@ -52,6 +56,7 @@ class App:
         add_url_button = dmc.Button(
             children="Add URL",
             color="blue",
+            id="add-url-button",
         )
 
         # Top bar
@@ -66,3 +71,26 @@ class App:
 
         # Return the layout
         return layout
+
+    def __callback_add_url(self, n_clicks: int) -> Any:
+        """An internal method to add a URL to the layout.
+
+        Args:
+            n_clicks (int): The number of times the button has been clicked.
+
+        Returns:
+            Any: The new layout.
+        """
+        # If the button has been clicked
+        if n_clicks:
+            # Add a new URL input
+            url_input = dmc.TextInput(
+                label="URL",
+                id={"type": "url-input", "index": n_clicks},
+            )
+
+            # Add the URL input to the layout
+            self.dash_app.layout.children.append(url_input)
+
+        # Return the new layout
+        return self.dash_app.layout
