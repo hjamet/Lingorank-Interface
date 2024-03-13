@@ -50,10 +50,10 @@ class App:
         )
 
         # Top bar
-        top_bar = dmc.SimpleGrid(
-            cols="1",
-            spacing="lg",
+        top_bar = dmc.Group(
             children=[title, add_url_button],
+            align="center",
+            position="apart",
         )
 
         # Add the top bar to the layout
