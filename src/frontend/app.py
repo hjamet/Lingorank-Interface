@@ -21,8 +21,10 @@ class App:
 
         # Add callbacks
         self.dash_app.callback(
-            dash.dependencies.Output("layout", "children"),
+            dash.dependencies.Output("add-url-modal", "opened"),
             dash.dependencies.Input("add-url-button", "n_clicks"),
+            dash.dependencies.State("add-url-modal", "opened"),
+            prevent_initial_call=True,
         )(self.__callback_add_url)
 
     def __call__(self, debug: bool = False, port: int = 5000):
@@ -66,31 +68,35 @@ class App:
             position="apart",
         )
 
-        # Add the top bar to the layout
-        layout.children.append(top_bar)
+        # Url input
+        text_input = dmc.TextInput(
+            placeholder="Enter URL",
+            id="url-input",
+        )
+
+        # Create Modal
+        modal = dmc.Modal(
+            children=[text_input],
+            title="Add URL",
+            id="add-url-modal",
+            centered=True,
+        )
+
+        # Add components to the layout
+        layout.children.extend([top_bar, modal])
 
         # Return the layout
         return layout
 
-    def __callback_add_url(self, n_clicks: int) -> Any:
-        """An internal method to add a URL to the layout.
+    def __callback_add_url(self, n_clicks: int, opened: bool) -> bool:
+        """An internal method to handle the add url button click.
 
         Args:
             n_clicks (int): The number of times the button has been clicked.
+            opened (bool): Whether the modal is open.
 
         Returns:
-            Any: The new layout.
+            bool: Whether the modal should be open.
         """
-        # If the button has been clicked
-        if n_clicks:
-            # Add a new URL input
-            url_input = dmc.TextInput(
-                label="URL",
-                id={"type": "url-input", "index": n_clicks},
-            )
-
-            # Add the URL input to the layout
-            self.dash_app.layout.children.append(url_input)
-
-        # Return the new layout
-        return self.dash_app.layout
+        # Return the opposite of the current state
+        return not opened
