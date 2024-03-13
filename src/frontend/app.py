@@ -35,8 +35,10 @@ class App:
         Returns:
             str: The layout of the app.
         """
-        # Create Hello World
-        hello_world = dmc.Title("Hello, World!")
+        # Empty layout
+        layout = dmc.Container()
+
+        # TODO - Add button to add url
 
         # Return the layout
-        return hello_world
+        return layout

@@ -21,6 +21,9 @@ bitsandbytes = "^0.43.0"
 protobuf = "^4.25.3"
 datasets = "^2.18.0"
 dash-iconify = "^0.1.2"
+markdownify = "^0.11.6"
+beautifulsoup4 = "^4.12.3"
+dash-bootstrap-components = "^1.5.0"
 
 
 [build-system]
