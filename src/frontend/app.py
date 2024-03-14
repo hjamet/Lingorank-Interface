@@ -44,7 +44,7 @@ class App:
             str: The layout of the app.
         """
         # Empty layout
-        layout = dmc.Container(children=[], id="layout", size="100%")
+        layout = dmc.Container(children=[], id="layout", size="80%")
 
         # Title of the app (underlined)
         title = dmc.Title(
@@ -72,11 +72,27 @@ class App:
         text_input = dmc.TextInput(
             placeholder="Enter URL",
             id="url-input",
+            style={"width": "100%"},
+        )
+
+        # Submit url button
+        submit_url_button = dmc.Button(
+            children="Submit",
+            color="blue",
+            id="submit-url-button",
+        )
+
+        # Creat stack for modal
+        modal_stack = dmc.Stack(
+            children=[text_input, submit_url_button],
+            spacing="xl",
+            align="flex-end",
         )
 
         # Create Modal
+        ## TODO: Check if an url is valid
         modal = dmc.Modal(
-            children=[text_input],
+            children=[modal_stack],
             title="Add URL",
             id="add-url-modal",
             centered=True,
