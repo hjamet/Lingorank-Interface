@@ -3,6 +3,8 @@ import flask
 import dash
 import dash_mantine_components as dmc
 
+from src.backend.ArticleDatabase import ArticleDatabase
+
 
 class App:
     def __init__(self):
@@ -20,12 +22,18 @@ class App:
         self.dash_app.layout = self.__get_layout()
 
         # Add callbacks
+        ## Add url modal
         self.dash_app.callback(
             dash.dependencies.Output("add-url-modal", "opened"),
             dash.dependencies.Input("add-url-button", "n_clicks"),
+            dash.dependencies.Input("submit-url-button", "n_clicks"),
             dash.dependencies.State("add-url-modal", "opened"),
+            dash.dependencies.State("url-input", "value"),
             prevent_initial_call=True,
-        )(self.__callback_add_url)
+        )(self.__callback_add_url_modal)
+
+        # Load the article database
+        self.article_database = ArticleDatabase()
 
     def __call__(self, debug: bool = False, port: int = 5000):
         """Run the server
@@ -104,15 +112,32 @@ class App:
         # Return the layout
         return layout
 
-    def __callback_add_url(self, n_clicks: int, opened: bool) -> bool:
-        """An internal method to handle the add url button click.
+    # ---------------------------------------------------------------------------- #
+    #                                   CALLBACKS                                  #
+    # ---------------------------------------------------------------------------- #
+
+    def __callback_add_url_modal(
+        self, n_clicks_add: int, n_clicks_submit: int, opened: bool, url: str
+    ):
+        """Callback for the add url modal.
 
         Args:
-            n_clicks (int): The number of times the button has been clicked.
-            opened (bool): Whether the modal is open.
+            n_clicks (int): The number of clicks on the add url button.
+            n_clicks_submit (int): The number of clicks on the submit url button.
+            opened (bool): Whether the modal is opened.
+            url (str): The url to add.
 
         Returns:
-            bool: Whether the modal should be open.
+            Any: Whether to open the modal or not.
         """
-        # Return the opposite of the current state
-        return not opened
+        # If the add url button was clicked
+        if n_clicks_add:
+            return not opened
+
+        # If the submit url button was clicked
+        if n_clicks_submit:
+            # Add the url to the database
+            self.article_database.add_article_from_url(url)
+
+            # Close the modal
+            return False

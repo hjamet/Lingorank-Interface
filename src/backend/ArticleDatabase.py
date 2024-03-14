@@ -1,6 +1,9 @@
 import os
 import pandas as pd
 import git
+import requests
+from bs4 import BeautifulSoup
+from markdownify import markdownify as md
 
 
 class ArticleDatabase:
@@ -27,7 +30,32 @@ class ArticleDatabase:
     # ---------------------------------------------------------------------------- #
 
     def add_article_from_url(self, url: str):
-        raise NotImplementedError
+        """This method will read an article from a url and add it to the database.
+        The method will try to extract the title, image, description and text of the article.
+
+        Args:
+            url (str): The url of the article.
+        """
+        # Get the page
+        page = requests.get(url)
+
+        # Parse the page
+        soup = BeautifulSoup(page.text, "html.parser")
+
+        # Get the title
+        title = soup.title.string
+
+        # Get the image
+        image = soup.find("img")["src"]
+
+        # Get the description
+        description = soup.find("meta", attrs={"name": "description"})["content"]
+
+        # Get the text
+        text = md(soup.prettify())
+
+        # Add the article
+        self.__add_article(url, title, image, description, text)
 
     # ---------------------------------------------------------------------------- #
     #                                PRIVATE METHODS                               #
