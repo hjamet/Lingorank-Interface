@@ -2,8 +2,11 @@ from typing import Any
 import flask
 import dash
 import dash_mantine_components as dmc
+import re
+import logging
 
 from src.backend.ArticleDatabase import ArticleDatabase
+from src.frontend.ArticlePage import ArticlePage
 
 
 class App:
@@ -22,7 +25,7 @@ class App:
         self.dash_app.layout = self.__get_layout()
 
         # Add callbacks
-        ## Add url modal
+        ## Url Modal
         self.dash_app.callback(
             dash.dependencies.Output("add-url-modal", "opened"),
             dash.dependencies.Input("add-url-button", "n_clicks"),
@@ -31,9 +34,18 @@ class App:
             dash.dependencies.State("url-input", "value"),
             prevent_initial_call=True,
         )(self.__callback_add_url_modal)
+        ## Content
+        self.dash_app.callback(
+            dash.dependencies.Output("content", "children"),
+            dash.dependencies.Input("url", "pathname"),
+            prevent_initial_call=True,
+        )(self.__callback_update_content)
 
         # Load the article database
         self.article_database = ArticleDatabase()
+
+        # Load subpages
+        self.article_page = ArticlePage()
 
     def __call__(self, debug: bool = False, port: int = 5000):
         """Run the server
@@ -52,7 +64,13 @@ class App:
             str: The layout of the app.
         """
         # Empty layout
-        layout = dmc.Container(children=[], id="layout", size="80%")
+        layout = dmc.Container(
+            children=[
+                dash.dcc.Location(id="url", refresh=False),
+            ],
+            id="layout",
+            size="80%",
+        )
 
         # ---------------------------------- HEADER ---------------------------------- #
 
@@ -109,12 +127,23 @@ class App:
         )
 
         # Creat Header
-        header = dmc.Header(
-            children=[top_bar, modal], height=50, position="top", withBorder=True
+        header = dmc.Header(children=[top_bar, modal], height=50, withBorder=True)
+
+        # Create content container
+        content = dmc.Container(
+            children=[],
+            id="content",
+            fluid=True,
+            style={
+                "height": "100%",
+                "overflowY": "auto",
+                "padding": "20px",
+                "boxSizing": "border-box",
+            },
         )
 
         # Add components to the layout
-        layout.children.extend([header])
+        layout.children.extend([header, content])
 
         # Return the layout
         return layout
@@ -147,3 +176,18 @@ class App:
 
             # Close the modal
             return False
+
+    def __callback_update_content(self, path: str):
+        """Callback to update the content of the app.
+
+        Args:
+            path (str): The path to the database.
+        """
+        # Capture the article id
+        article_id = re.findall(r"/article/(\d+)", path)
+        if article_id:
+            return self.article_page.get_layout(
+                self.article_database.get_article(int(article_id[0]))
+            )
+        else:
+            logging.warning(f"The path {path} is not valid.")

@@ -20,17 +20,19 @@ class ArticlePage:
         title = dmc.Title(children=article["title"], order=1)
 
         # Image
-        image = dmc.Image(src=article["image"], alt=article["title"], order=2)
+        image = dmc.Image(src=article["image"], alt=article["title"])
 
         # Description
-        description = dmc.Text(children=article["description"], order=3)
+        description = dmc.Text(children=article["description"])
 
         # Text
-        text = dmc.Text(children=article["text"], order=4)
+        text = dmc.Text(children=article["text"])
 
-        # Create the layout
+        # Container
         layout = dmc.Container(
-            children=[title, image, description, text], id="article-layout", size="80%"
+            children=[title, image, description, text],
+            id="article-layout",
+            size="80%",
         )
 
         return layout
