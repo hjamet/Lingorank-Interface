@@ -187,7 +187,7 @@ class App:
         article_id = re.findall(r"/article/(\d+)", path)
         if article_id:
             return self.article_page.get_layout(
-                self.article_database.get_article(int(article_id[0]))
+                article_id=int(article_id[0]),
             )
         else:
             logging.warning(f"The path {path} is not valid.")

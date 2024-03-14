@@ -63,6 +63,7 @@ class ArticleDatabase:
         # Get the image
         try:
             image = soup.find("img")["src"]
+            image = image if image.startswith("http") else url.split("/")[0] + image
         except:
             logging.warning(f"Could not get the image at {url}")
             # Default image
@@ -77,6 +78,7 @@ class ArticleDatabase:
             description = "No description"
 
         # Get the text
+        ## TODO : Fix links
         text = md.MarkdownConverter().convert_soup(soup)
 
         # Add the article
@@ -92,7 +94,11 @@ class ArticleDatabase:
             dict: The article.
         """
         df = pd.read_json(self.path)
-        return df.iloc[article_id].to_dict()
+
+        try:
+            return df.iloc[article_id].to_dict()
+        except:
+            logging.error(f"The article with id {article_id} does not exist.")
 
     # ---------------------------------------------------------------------------- #
     #                                PRIVATE METHODS                               #
