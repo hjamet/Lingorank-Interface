@@ -3,7 +3,8 @@ import pandas as pd
 import git
 import requests
 from bs4 import BeautifulSoup
-from markdownify import markdownify as md
+import markdownify as md
+import logging
 
 
 class ArticleDatabase:
@@ -36,23 +37,47 @@ class ArticleDatabase:
         Args:
             url (str): The url of the article.
         """
+        # Check if url not already in database
+        df = pd.read_csv(self.path)
+        if url in df["url"].values:
+            logging.warning(f"The url {url} is already in the database.")
+            return
+
         # Get the page
-        page = requests.get(url)
+        try:
+            page = requests.get(url)
+        except:
+            logging.error(f"Could not get the page at {url}")
 
         # Parse the page
         soup = BeautifulSoup(page.text, "html.parser")
 
         # Get the title
-        title = soup.title.string
+        try:
+            title = soup.title.string
+        except:
+            logging.warning(f"Could not get the title at {url}")
+            # Default title (the domain name)
+            title = url.split("//")[0]
 
         # Get the image
-        image = soup.find("img")["src"]
+        try:
+            image = soup.find("img")["src"]
+        except:
+            logging.warning(f"Could not get the image at {url}")
+            # Default image
+            image = "https://static.thenounproject.com/png/2684410-200.png"
 
         # Get the description
-        description = soup.find("meta", attrs={"name": "description"})["content"]
+        try:
+            description = soup.find("meta", attrs={"name": "description"})["content"]
+        except:
+            logging.warning(f"Could not get the description at {url}")
+            # Default description
+            description = "No description"
 
         # Get the text
-        text = md(soup.prettify())
+        text = md.MarkdownConverter().convert_soup(soup)
 
         # Add the article
         self.__add_article(url, title, image, description, text)

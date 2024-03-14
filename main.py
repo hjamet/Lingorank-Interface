@@ -1,4 +1,4 @@
-from src.frontend.app import App
+from src.frontend.App import App
 
 if __name__ == "__main__":
     # Create the app

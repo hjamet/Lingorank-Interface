@@ -54,6 +54,8 @@ class App:
         # Empty layout
         layout = dmc.Container(children=[], id="layout", size="80%")
 
+        # ---------------------------------- HEADER ---------------------------------- #
+
         # Title of the app (underlined)
         title = dmc.Title(
             children="Lingorank Demo",
@@ -106,8 +108,13 @@ class App:
             centered=True,
         )
 
+        # Creat Header
+        header = dmc.Header(
+            children=[top_bar, modal], height=50, position="top", withBorder=True
+        )
+
         # Add components to the layout
-        layout.children.extend([top_bar, modal])
+        layout.children.extend([header])
 
         # Return the layout
         return layout
@@ -116,26 +123,25 @@ class App:
     #                                   CALLBACKS                                  #
     # ---------------------------------------------------------------------------- #
 
-    def __callback_add_url_modal(
-        self, n_clicks_add: int, n_clicks_submit: int, opened: bool, url: str
-    ):
+    def __callback_add_url_modal(self, n_click: int, _, opened: bool, url: str):
         """Callback for the add url modal.
 
         Args:
-            n_clicks (int): The number of clicks on the add url button.
-            n_clicks_submit (int): The number of clicks on the submit url button.
+            n_click (int): The number of clicks on the button
             opened (bool): Whether the modal is opened.
             url (str): The url to add.
 
         Returns:
             Any: Whether to open the modal or not.
         """
+        # Get context
+        ctx = dash.callback_context
         # If the add url button was clicked
-        if n_clicks_add:
+        if ctx.triggered_id == "add-url-button":
             return not opened
 
         # If the submit url button was clicked
-        if n_clicks_submit:
+        if ctx.triggered_id == "submit-url-button":
             # Add the url to the database
             self.article_database.add_article_from_url(url)
 
