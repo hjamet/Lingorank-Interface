@@ -74,6 +74,7 @@ class ArticleList:
         description = dmc.Text(article["description"], size="sm", color="dimmed")
 
         # Button
+        ## TODO: Link to article
         read_button = dmc.Button(
             "Read now",
             variant="light",

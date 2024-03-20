@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from urllib.parse import urljoin
 
 import bs4
 import git
@@ -55,6 +56,9 @@ class ArticleDatabase:
         # Parse the page
         soup = BeautifulSoup(page.text, "html.parser")
 
+        # Make the links absolute
+        soup = self.__make_links_absolute(soup, url)
+
         # Get the title
         try:
             title = soup.title.string
@@ -65,8 +69,7 @@ class ArticleDatabase:
 
         # Get the image
         try:
-            image = soup.find("img")["src"]
-            image = image if image.startswith("http") else url.split("/")[0] + image
+            image = self.__get_largest_image_url(soup)
         except:
             logging.warning(f"Could not get the image at {url}")
             # Default image
@@ -141,6 +144,27 @@ class ArticleDatabase:
         # Save the database
         df.to_json(self.path, orient="records")
 
+    # ---------------------------------- HELPERS --------------------------------- #
+
+    def __make_links_absolute(self, soup, base_url):
+        # Modifier les liens relatifs dans les balises <a>
+        for a_tag in soup.find_all("a", href=True):
+            a_tag["href"] = urljoin(base_url, a_tag["href"])
+
+        # Modifier les liens relatifs dans les balises <img>
+        for img_tag in soup.find_all("img", src=True):
+            img_tag["src"] = urljoin(base_url, img_tag["src"])
+
+        # Modifier les liens relatifs dans les balises <link>
+        for link_tag in soup.find_all("link", href=True):
+            link_tag["href"] = urljoin(base_url, link_tag["href"])
+
+        # Modifier les liens relatifs dans les balises <script>
+        for script_tag in soup.find_all("script", src=True):
+            script_tag["src"] = urljoin(base_url, script_tag["src"])
+
+        return soup
+
     def __extract_mardown(self, soup: BeautifulSoup, url: str):
         """Convert a soup to markdown.
 
@@ -173,15 +197,40 @@ class ArticleDatabase:
         for empty in soup.find_all(lambda tag: not tag.contents):
             empty.decompose()
 
-        # Fix links
-        for link in soup.find_all("a"):
-            if link.get("href") is not None and not link["href"].startswith("http"):
-                link["href"] = "/".join(url.split("/")[:3] + [link["href"]])
-
         # Convert to markdown
         markdown_content = md.MarkdownConverter().convert_soup(soup)
 
         return markdown_content
+
+    def __get_largest_image_url(self, soup: BeautifulSoup):
+        """Get the largest image url from a soup.
+
+        Args:
+            soup (BeautifulSoup): The soup.
+
+        Returns:
+            str: The largest image url.
+        """
+        # Trouver toutes les balises <img> dans la soup
+        img_tags = soup.find_all("img")
+
+        largest_image_url = None
+        largest_image_width = 0
+
+        for img in img_tags:
+            try:
+                # Récupérer les dimensions de l'image si disponibles
+                width = int(img.get("width", 0))
+
+                # Vérifier si c'est la plus grande image jusqu'à présent
+                if width > largest_image_width:
+                    largest_image_width = width
+                    largest_image_url = img["src"]
+            except (KeyError, ValueError):
+                # Ignorer les balises <img> sans attributs width, height ou src valides
+                pass
+
+        return largest_image_url
 
     def __len__(self):
         """Get the length of the database.
