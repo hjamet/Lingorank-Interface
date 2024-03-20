@@ -7,6 +7,7 @@ import logging
 
 from src.backend.ArticleDatabase import ArticleDatabase
 from src.frontend.ArticlePage import ArticlePage
+from src.frontend.ArticleList import ArticleList
 
 
 class App:
@@ -192,5 +193,7 @@ class App:
             return self.article_page.get_layout(
                 article_id=int(article_id[0]),
             )
+        elif path == "/":
+            return ArticleList().get_layout()
         else:
             logging.warning(f"The path {path} is not valid.")
