@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from io import BytesIO
 from urllib.parse import urljoin
 
 import bs4
@@ -9,6 +10,7 @@ import markdownify as md
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from PIL import Image
 
 
 class ArticleDatabase:
@@ -49,7 +51,9 @@ class ArticleDatabase:
 
         # Get the page
         try:
-            page = requests.get(url)
+            page = requests.get(
+                url, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True
+            )
         except:
             logging.error(f"Could not get the page at {url}")
 
@@ -220,7 +224,17 @@ class ArticleDatabase:
         for img in img_tags:
             try:
                 # Récupérer les dimensions de l'image si disponibles
-                width = int(img.get("width", 0))
+                try:
+                    width = int(img.get("width", 0))
+                except:
+                    width = 0
+                if width == 0:
+                    try:
+                        response = requests.get(img["src"])
+                        image = Image.open(BytesIO(response.content))
+                        width = image.size[0]
+                    except:
+                        continue
 
                 # Vérifier si c'est la plus grande image jusqu'à présent
                 if width > largest_image_width:
