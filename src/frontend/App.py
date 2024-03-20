@@ -12,6 +12,7 @@ from src.frontend.ArticlePage import ArticlePage
 from src.frontend.ArticleList import ArticleList
 
 
+# TODO : Transform class into page -> register the page in the app
 class App:
     def __init__(self):
         # Start the Flask server
@@ -201,9 +202,6 @@ class App:
         ctx = dash.callback_context
         # If the add url button was clicked
         if ctx.triggered_id == "add-url-button":
-            import time
-
-            time.sleep(10)
             return not opened
 
         # If the submit url button was clicked
