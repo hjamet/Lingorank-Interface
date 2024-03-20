@@ -74,12 +74,15 @@ class App:
 
         # ---------------------------------- HEADER ---------------------------------- #
 
-        # Title of the app (underlined)
-        title = dmc.Title(
-            children="Lingorank Demo",
-            order=1,
-            align="center",
-            style={"textDecoration": "underline"},
+        # Title of the app (underlined and clickable)
+        title = dash.dcc.Link(
+            href="/",  # Redirect to the root of the site
+            children=dmc.Title(
+                children="Lingorank Demo",
+                order=1,
+                align="center",
+            ),
+            style={"textDecoration": "none", "color": "black"},
         )
 
         # Add url button
