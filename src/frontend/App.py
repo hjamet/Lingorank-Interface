@@ -4,6 +4,8 @@ import dash
 import dash_mantine_components as dmc
 import re
 import logging
+import os
+
 
 from src.backend.ArticleDatabase import ArticleDatabase
 from src.frontend.ArticlePage import ArticlePage
@@ -21,6 +23,24 @@ class App:
             server=self.flask_app,
             url_base_pathname="/",
         )
+
+        # Start background task manager
+        if "REDIS_URL" in os.environ:
+            # Use Redis & Celery if REDIS_URL set as an env variable
+            from celery import Celery
+
+            celery_app = Celery(
+                __name__,
+                broker=os.environ["REDIS_URL"],
+                backend=os.environ["REDIS_URL"],
+            )
+            self.background_callback_manager = dash.CeleryManager(celery_app)
+        else:
+            # Diskcache for non-production apps when developing locally
+            import diskcache
+
+            cache = diskcache.Cache("./cache")
+            self.background_callback_manager = dash.DiskcacheManager(cache)
 
         # Set the layout
         self.dash_app.layout = self.__get_layout()
@@ -47,7 +67,7 @@ class App:
 
         # Load subpages
         self.article_page = ArticlePage()
-        self.article_list = ArticleList(self.dash_app)
+        self.article_list = ArticleList(self)
 
     def __call__(self, debug: bool = False, port: int = 5000):
         """Run the server
