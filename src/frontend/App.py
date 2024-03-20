@@ -47,6 +47,7 @@ class App:
 
         # Load subpages
         self.article_page = ArticlePage()
+        self.article_list = ArticleList(self.dash_app)
 
     def __call__(self, debug: bool = False, port: int = 5000):
         """Run the server
@@ -194,6 +195,6 @@ class App:
                 article_id=int(article_id[0]),
             )
         elif path == "/":
-            return ArticleList().get_layout()
+            return self.article_list.get_layout()
         else:
             logging.warning(f"The path {path} is not valid.")
