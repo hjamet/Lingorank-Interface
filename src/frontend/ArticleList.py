@@ -19,13 +19,6 @@ class ArticleList:
         self.article_database = app.article_database
         self.background_callback_manager = app.background_callback_manager
 
-        # Add callback
-        self.dash_app.callback(
-            dash.dependencies.Output("article-loading-skeleton", "visible"),
-            dash.dependencies.Input("submit-url-button", "n_clicks"),
-            prevent_initial_call=True,
-        )(self.__callback_loading_div)
-
     def get_layout(self):
         """Get the layout of the article list.
 
@@ -39,8 +32,8 @@ class ArticleList:
             cards.append(self.__create_card(article))
 
         # Loading skeleton
-        loading_skeleton = dmc.Skeleton(
-            id="article-loading-skeleton",
+        loading_skeleton = dash.html.Div(
+            id="article-loading-div",
             children=dmc.Stack(
                 [
                     dmc.Skeleton(
@@ -66,7 +59,7 @@ class ArticleList:
                 ],
                 spacing="xl",
             ),
-            visible=False,
+            style={"display": "none"},
         )
         cards.append(loading_skeleton)
 
@@ -89,20 +82,6 @@ class ArticleList:
     # ---------------------------------------------------------------------------- #
     #                                PRIVATE METHODS                               #
     # ---------------------------------------------------------------------------- #
-
-    # --------------------------------- CALLBACKS -------------------------------- #
-    def __callback_loading_div(self, n_clicks: int):
-        """Callback for the loading div.
-
-        Args:
-            n_clicks (int): The number of clicks on the submit url button.
-
-        Returns:
-            dict: The style of the loading div.
-        """
-        if n_clicks:
-            return True
-        return False
 
     # ---------------------------------- HELPERS --------------------------------- #
 

@@ -17,13 +17,6 @@ class App:
         # Start the Flask server
         self.flask_app = flask.Flask(__name__)
 
-        # Create the Dash app
-        self.dash_app = dash.Dash(
-            __name__,
-            server=self.flask_app,
-            url_base_pathname="/",
-        )
-
         # Start background task manager
         if "REDIS_URL" in os.environ:
             # Use Redis & Celery if REDIS_URL set as an env variable
@@ -39,8 +32,16 @@ class App:
             # Diskcache for non-production apps when developing locally
             import diskcache
 
-            cache = diskcache.Cache("./cache")
+            cache = diskcache.Cache("./.cache")
             self.background_callback_manager = dash.DiskcacheManager(cache)
+
+        # Create the Dash app
+        self.dash_app = dash.Dash(
+            __name__,
+            server=self.flask_app,
+            url_base_pathname="/",
+            background_callback_manager=self.background_callback_manager,
+        )
 
         # Set the layout
         self.dash_app.layout = self.__get_layout()
@@ -54,6 +55,14 @@ class App:
             dash.dependencies.State("add-url-modal", "opened"),
             dash.dependencies.State("url-input", "value"),
             prevent_initial_call=True,
+            background=True,
+            running=[
+                (
+                    dash.dependencies.Output("article-loading-div", "style"),
+                    {"display": "block"},
+                    {"display": "none"},
+                )
+            ],
         )(self.__callback_add_url_modal)
         ## Content
         self.dash_app.callback(
@@ -192,6 +201,9 @@ class App:
         ctx = dash.callback_context
         # If the add url button was clicked
         if ctx.triggered_id == "add-url-button":
+            import time
+
+            time.sleep(10)
             return not opened
 
         # If the submit url button was clicked
