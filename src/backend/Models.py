@@ -51,7 +51,6 @@ class Models:
         )
 
         # Load the sentence simplification model
-        # TODO Acheter DDR5 30GO -> 64GO
         ## Add quantization
         kwargs = {
             "pretrained_model_name_or_path": "bofenghuang/vigostral-7b-chat",

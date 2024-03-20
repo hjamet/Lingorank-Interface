@@ -29,13 +29,6 @@ class ArticlePage:
         # Title
         title = dmc.Title(children=article["title"], order=1)
 
-        # Image
-        image = dmc.Center(
-            dmc.Image(
-                src=article["image"], alt=article["title"], width="50%", height="50%"
-            )
-        )
-
         # Text
         text = dash.dcc.Markdown(
             children=article["text"],
@@ -44,7 +37,7 @@ class ArticlePage:
 
         # Container
         layout = dmc.Container(
-            children=[title, image, text],
+            children=[title, text],
             id="article-layout",
             size="80%",
         )

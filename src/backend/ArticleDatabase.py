@@ -3,6 +3,7 @@ import pandas as pd
 import git
 import requests
 from bs4 import BeautifulSoup
+import bs4
 import markdownify as md
 import logging
 
@@ -78,13 +79,32 @@ class ArticleDatabase:
             description = "No description"
 
         # Get the text
-        ## TODO : Fix links
+        # Remove meta tags
+        for meta in soup.find_all("meta"):
+            meta.decompose()
+        # Remove script tags
+        for script in soup.find_all("script"):
+            script.decompose()
+        # Remove style tags
+        for style in soup.find_all("style"):
+            style.decompose()
+        # Remove comments
+        for comment in soup.find_all(
+            text=lambda text: isinstance(text, bs4.element.Comment)
+        ):
+            comment.extract()
+        # Remove hidden inputs
+        for hidden in soup.find_all(type="hidden"):
+            hidden.decompose()
+        # Remove empty tags
+        for empty in soup.find_all(lambda tag: not tag.contents):
+            empty.decompose()
         text = md.MarkdownConverter().convert_soup(soup)
 
         # Add the article
         self.__add_article(url, title, image, description, text)
 
-    def get_article(self, article_id: int) -> dict:
+    def get_article(self, article_id: int):
         """Get an article from the database.
 
         Args:
