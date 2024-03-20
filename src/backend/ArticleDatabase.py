@@ -1,11 +1,13 @@
+import logging
 import os
-import pandas as pd
+import re
+
+import bs4
 import git
+import markdownify as md
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import bs4
-import markdownify as md
-import logging
 
 
 class ArticleDatabase:
@@ -79,27 +81,7 @@ class ArticleDatabase:
             description = "No description"
 
         # Get the text
-        # Remove meta tags
-        for meta in soup.find_all("meta"):
-            meta.decompose()
-        # Remove script tags
-        for script in soup.find_all("script"):
-            script.decompose()
-        # Remove style tags
-        for style in soup.find_all("style"):
-            style.decompose()
-        # Remove comments
-        for comment in soup.find_all(
-            text=lambda text: isinstance(text, bs4.element.Comment)
-        ):
-            comment.extract()
-        # Remove hidden inputs
-        for hidden in soup.find_all(type="hidden"):
-            hidden.decompose()
-        # Remove empty tags
-        for empty in soup.find_all(lambda tag: not tag.contents):
-            empty.decompose()
-        text = md.MarkdownConverter().convert_soup(soup)
+        text = self.__extract_mardown(soup, url)
 
         # Add the article
         self.__add_article(url, title, image, description, text)
@@ -158,3 +140,45 @@ class ArticleDatabase:
 
         # Save the database
         df.to_json(self.path, orient="records")
+
+    def __extract_mardown(self, soup: BeautifulSoup, url: str):
+        """Convert a soup to markdown.
+
+        Args:
+            soup (BeautifulSoup): The soup to convert.
+            url (str): The url of the page.
+
+        Returns:
+            str: The markdown.
+        """
+        # Remove meta tags
+        for meta in soup.find_all("meta"):
+            meta.decompose()
+        # Remove script tags
+        for script in soup.find_all("script"):
+            script.decompose()
+        # Remove style tags
+        for style in soup.find_all("style"):
+            style.decompose()
+        # Remove comments
+        for comment in soup.find_all(
+            text=lambda text: isinstance(text, bs4.element.Comment)
+        ):
+            comment.extract()
+        # Remove hidden inputs
+        for hidden in soup.find_all(type="hidden"):
+            hidden.decompose()
+
+        # Remove empty tags
+        for empty in soup.find_all(lambda tag: not tag.contents):
+            empty.decompose()
+
+        # Fix links
+        for link in soup.find_all("a"):
+            if link.get("href") is not None and not link["href"].startswith("http"):
+                link["href"] = "/".join(url.split("/")[:3] + [link["href"]])
+
+        # Convert to markdown
+        markdown_content = md.MarkdownConverter().convert_soup(soup)
+
+        return markdown_content
