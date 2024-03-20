@@ -182,3 +182,11 @@ class ArticleDatabase:
         markdown_content = md.MarkdownConverter().convert_soup(soup)
 
         return markdown_content
+
+    def __len__(self):
+        """Get the length of the database.
+
+        Returns:
+            int: The length of the database.
+        """
+        return len(pd.read_json(self.path))
