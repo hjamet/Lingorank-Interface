@@ -9,13 +9,13 @@ import src.Config as Config
 
 import src.backend.ArticleDatabase as ArticleDatabase
 
+MODAL_OPENED = False
+
 
 def layout():
     # Empty layout
     layout = dmc.Container(
-        children=[
-            dash.dcc.Location(id="url", refresh=False),
-        ],
+        children=[dash.dcc.Location(id="redirect", refresh=True)],
         id="layout",
         size="80%",
     )
@@ -100,18 +100,9 @@ def layout():
     dash.dependencies.Input("add-url-button", "n_clicks"),
     dash.dependencies.Input("submit-url-button", "n_clicks"),
     dash.dependencies.State("add-url-modal", "opened"),
-    dash.dependencies.State("url-input", "value"),
     prevent_initial_call=True,
-    background=True,
-    running=[
-        (
-            dash.dependencies.Output("article-loading-div", "style"),
-            {"display": "block"},
-            {"display": "none"},
-        )
-    ],
 )
-def callback_add_url_modal(n_click: int, _, opened: bool, url: str):
+def callback_add_url_modal(n_click: int, _, opened: bool):
     """Callback for the add url modal.
 
     Args:
@@ -126,15 +117,27 @@ def callback_add_url_modal(n_click: int, _, opened: bool, url: str):
     ctx = dash.callback_context
     # If the add url button was clicked
     if ctx.triggered_id == "add-url-button":
+        # Open the modal
         return not opened
 
     # If the submit url button was clicked
     if ctx.triggered_id == "submit-url-button":
-        # Add the url to the database
-        ArticleDatabase.add_article_from_url(url)
-
         # Close the modal
-        return False
+        return not opened
+
+
+@dash.callback(
+    dash.dependencies.Output("redirect", "href"),
+    dash.dependencies.Input("submit-url-button", "n_clicks"),
+    dash.dependencies.State("url-input", "value"),
+    prevent_initial_call=True,
+)
+def callback_update_article_list(n_clicks: int, url: str):
+    # Add the article
+    ArticleDatabase.add_article_from_url(url)
+
+    # Redirect to the root of the site
+    return "/"
 
 
 # ---------------------------------------------------------------------------- #
