@@ -1,23 +1,18 @@
 import logging
 import os
-import re
 from io import BytesIO
 from urllib.parse import urljoin
+import src.Config as Config
 
 import bs4
-import git
 import markdownify as md
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from PIL import Image
 
-
-# Find pwd
-pwd = git.Repo(os.getcwd(), search_parent_directories=True).working_tree_dir
-
 # Path to the database
-path = os.path.join(pwd, "data/articles.json")
+path = os.path.join(Config.pwd, "data/articles.json")
 
 # Create the database if it doesn't exist
 if not os.path.exists(path):
