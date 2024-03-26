@@ -37,6 +37,7 @@ def add_article_from_url(url: str):
         )
     except:
         logging.error(f"Could not get the page at {url}")
+        return
 
     # Parse the page
     soup = BeautifulSoup(page.text, "html.parser")
@@ -117,6 +118,14 @@ def __add_article(url: str, title: str, image: str, description: str, text: str)
 
     # Save the database
     df.to_json(path, orient="records")
+
+    # Check if the database is not corrupted
+    try:
+        pd.read_json(path)
+    except:
+        logging.error("The database is corrupted.")
+
+    return
 
 
 def __make_links_absolute(soup, base_url):
