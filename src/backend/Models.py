@@ -17,6 +17,12 @@ import torch
 from tqdm import tqdm as console_tqdm
 from torch.utils.data import DataLoader
 import src.Config as Config
+import nltk.data
+
+
+def compute_text_difficulty(text: str):
+    tokenizer = nltk.data.load("tokenizers/punkt/french.pickle")
+    return compute_sentences_difficulty(tokenizer.tokenize(text))
 
 
 def compute_sentences_difficulty(sentences: List[str]):
@@ -233,45 +239,47 @@ if not os.path.exists(scratch_path):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Load the difficulty estimation model
-bert_tokenizer = CamembertTokenizer.from_pretrained("camembert/camembert-base")
-difficulty_estimation_pipeline = pipeline(
-    "text-classification",
-    model="OloriBern/Lingorank_Bert_french_difficulty",
-    device=device,
-    tokenizer=bert_tokenizer,
-)
+if Config.difficulty_estimation:
+    bert_tokenizer = CamembertTokenizer.from_pretrained("camembert/camembert-base")
+    difficulty_estimation_pipeline = pipeline(
+        "text-classification",
+        model="OloriBern/Lingorank_Bert_french_difficulty",
+        device=device,
+        tokenizer=bert_tokenizer,
+    )
 
 # Load the sentence simplification model
-## Add quantization
-kwargs = {
-    "pretrained_model_name_or_path": "bofenghuang/vigostral-7b-chat",
-    "trust_remote_code": True,
-}
-if Config.quantization:
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_use_double_quant=True,
+if Config.simplification:
+    ## Add quantization
+    kwargs = {
+        "pretrained_model_name_or_path": "bofenghuang/vigostral-7b-chat",
+        "trust_remote_code": True,
+    }
+    if Config.quantization:
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+        kwargs["quantization_config"] = bnb_config
+        kwargs["torch_dtype"] = torch.bfloat16
+    ## Load PeftModel
+    config = PeftConfig.from_pretrained("OloriBern/Mistral-7B-French-Simplification")
+    mistral_model = AutoModelForCausalLM.from_pretrained(**kwargs)
+    mistral_model = PeftModel.from_pretrained(
+        mistral_model,
+        "OloriBern/Mistral-7B-French-Simplification",
+        config=config,
     )
-    kwargs["quantization_config"] = bnb_config
-    kwargs["torch_dtype"] = torch.bfloat16
-## Load PeftModel
-config = PeftConfig.from_pretrained("OloriBern/Mistral-7B-French-Simplification")
-mistral_model = AutoModelForCausalLM.from_pretrained(**kwargs)
-mistral_model = PeftModel.from_pretrained(
-    mistral_model,
-    "OloriBern/Mistral-7B-French-Simplification",
-    config=config,
-)
-## Load Tokenizer
-mistral_tokenizer = __download_tokenizer()
+    ## Load Tokenizer
+    mistral_tokenizer = __download_tokenizer()
 
 print("Models loaded successfully.")
 
 # ---------------------------------------------------------------------------- #
 #                                     TESTS                                    #
 # ---------------------------------------------------------------------------- #
-if __name__ == "__main__" or True:
+if __name__ == "__main__":
     # Test the difficulty estimation model
     sentence = [
         "Le chat est sur le tapis.",

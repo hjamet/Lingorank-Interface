@@ -10,6 +10,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from PIL import Image
+import src.backend.Models as Models
 
 # Path to the database
 path = os.path.join(Config.pwd, "data/articles.json")
@@ -71,6 +72,9 @@ def add_article_from_url(url: str):
 
     # Get the text
     text = __extract_mardown(soup, url)
+
+    # Compute difficulty
+    difficulty_list = Models.compute_text_difficulty(text)
 
     # Add the article
     __add_article(url, title, image, description, text)

@@ -9,6 +9,8 @@ debug = True
 port = 5000
 
 # ---------------------------------- MODELS ---------------------------------- #
+difficulty_estimation = True
+simplification = False
 quantization = False
 
 # ---------------------------------------------------------------------------- #
