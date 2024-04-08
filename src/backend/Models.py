@@ -40,11 +40,12 @@ def compute_sentences_difficulty(sentences: List[str]):
     return [labels_map[prediction["label"]] for prediction in predictions]
 
 
-def simplify_sentences(sentences: List[str]):
+def simplify_sentences(sentences: List[str], model: str = "mistral-7B"):
     """Simplify multiple sentences in French.
 
     Args:
         sentence (List[str]): A list of sentences in French.
+        model (str, optional): The model to use for simplification. Can be either "mistral-7B" or "gpt-3.5-turbo-1106" Defaults to "mistral".
 
     Returns:
         List[str]: The simplified sentences.
@@ -58,36 +59,44 @@ def simplify_sentences(sentences: List[str]):
     # Format data
     inputs = __format_data_mistral(inputs)
 
-    # Encode dataset
-    encoded_dataset = __encode_dataset(inputs, mistral_tokenizer)
+    if model == "gpt-3.5-turbo-1106":
+        pass
+    elif model == "mistral-7B":
+        # Encode dataset
+        encoded_dataset = __encode_dataset(inputs, mistral_tokenizer)
 
-    # Simplify sentences
-    test_loader = DataLoader(encoded_dataset, batch_size=16)
+        # Simplify sentences
+        test_loader = DataLoader(encoded_dataset, batch_size=16)
 
-    # Generate predictions
-    with torch.no_grad():
-        mistral_model.eval()
-        predictions_ids = []
+        # Generate predictions
+        with torch.no_grad():
+            mistral_model.eval()
+            predictions_ids = []
 
-        for batch in console_tqdm(test_loader):
-            input_ids_batch = batch["input_ids"].to("cpu")
-            attention_mask_batch = batch["attention_mask"].to("cpu")
+            for batch in console_tqdm(test_loader):
+                input_ids_batch = batch["input_ids"].to("cpu")
+                attention_mask_batch = batch["attention_mask"].to("cpu")
 
-            outputs = mistral_model.generate(
-                input_ids=input_ids_batch,
-                attention_mask=attention_mask_batch,
-                max_length=max(128, input_ids_batch.shape[1] * 2),
-                num_return_sequences=1,
-            )
+                outputs = mistral_model.generate(
+                    input_ids=input_ids_batch,
+                    attention_mask=attention_mask_batch,
+                    max_length=max(128, input_ids_batch.shape[1] * 2),
+                    num_return_sequences=1,
+                )
 
-            predictions_ids.extend(outputs)
-        predictions = [
-            mistral_tokenizer.decode(prediction, skip_special_tokens=True)
-            for prediction in predictions_ids
-        ]
-        predictions_series = pd.Series(predictions)
+                predictions_ids.extend(outputs)
+            predictions = [
+                mistral_tokenizer.decode(prediction, skip_special_tokens=True)
+                for prediction in predictions_ids
+            ]
+            predictions_series = pd.Series(predictions)
+    else:
+        raise ValueError(f"Invalid model name {model}.")
 
     return predictions_series
+
+
+# ------------------------- PRIVATE MISTRAL FUNCTIONS ------------------------ #
 
 
 def __download_tokenizer(
@@ -220,6 +229,89 @@ def __encode_dataset(dataset: Dataset, tokenizer: AutoTokenizer):
     return encoded_dataset
 
 
+# ------------------------- PRIVATE OPENAI FUNCTIONS ------------------------- #
+
+# ----------------------- ZERO-SHOT EVALUATION FUNCTION ---------------------- #
+from tqdm import notebook as notebook_tqdm
+import openai
+import pandas as pd
+import signal, time
+
+
+# Connect to OpenAI
+def connect_to_openai():
+    try:
+        with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "r") as f:
+            openai_key = f.read()
+            openai.api_key = openai_key
+    except:
+        key = input("Please enter your OpenAI key: ")
+        with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "w") as f:
+            f.write(key)
+        openai.api_key = key
+
+
+class Timeout:
+    """Timeout class using ALARM signal"""
+
+    class Timeout(Exception):
+        pass
+
+    def __init__(self, sec):
+        self.sec = sec
+
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.raise_timeout)
+        signal.alarm(self.sec)
+
+    def __exit__(self, *args):
+        signal.alarm(0)  # disable alarm
+
+    def raise_timeout(self, *args):
+        raise Timeout.Timeout()
+
+
+def evaluate_openai(inputs: pd.Series, model: str, context: str):
+    # Compute predictions
+    predictions = []
+    for text in notebook_tqdm.tqdm(inputs):
+        try:
+            with Timeout(15):
+                if "gpt" in model:
+                    response = openai.ChatCompletion.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": context},
+                            {"role": "user", "content": text},
+                        ],
+                        max_tokens=len(text) * 2,
+                    )
+                    prediction = response.choices[0]["message"]["content"].strip()
+                else:
+                    response = openai.Completion.create(
+                        engine=model,
+                        prompt=f"{context}{text}",
+                        max_tokens=len(text) * 2,
+                    )
+                    prediction = response.choices[0].text.strip()
+        except Exception as e:
+            print(e)
+            print(f"Error with text: {text}")
+            print("Skipping...")
+            predictions.append("Error")
+            continue
+
+        predictions.append(prediction)
+        # Save prediction for security
+        pd.DataFrame(predictions).to_csv(
+            os.path.join(Config.pwd, "scratch", "openai_predictions.csv"), index=False
+        )
+
+    return pd.DataFrame(predictions)
+
+
+# import
+
 # ---------------------------------------------------------------------------- #
 #                                INITIALIZATION                                #
 # ---------------------------------------------------------------------------- #
@@ -265,6 +357,9 @@ mistral_model = PeftModel.from_pretrained(
 )
 ## Load Tokenizer
 mistral_tokenizer = __download_tokenizer()
+
+# Load the OpenAI models
+connect_to_openai()
 
 print("Models loaded successfully.")
 
