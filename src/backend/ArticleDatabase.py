@@ -2,15 +2,16 @@ import logging
 import os
 from io import BytesIO
 from urllib.parse import urljoin
-import src.Config as Config
 
-import bs4
-import markdownify as md
 import pandas as pd
 import requests
+import trafilatura
 from bs4 import BeautifulSoup
 from PIL import Image
+
 import src.backend.Models as Models
+import src.Config as Config
+import re
 
 # Path to the database
 path = os.path.join(Config.pwd, "data/articles.json")
@@ -46,42 +47,62 @@ def add_article_from_url(url: str):
     # Make the links absolute
     soup = __make_links_absolute(soup, url)
 
+    # Parse the soup
+    parsed = trafilatura.bare_extraction(
+        soup.prettify(),
+        url=url,
+        include_formatting=True,
+        include_images=True,
+        favor_precision=True,
+    )
+
     # Get the title
-    try:
-        title = soup.title.string
-    except:
+    if parsed["title"] is not None:
+        title = parsed["title"]
+    else:
         logging.warning(f"Could not get the title at {url}")
         # Default title (the domain name)
         title = url.split("//")[0]
 
     # Get the image
-    try:
-        image = __get_largest_image_url(soup)
-    except:
-        logging.warning(f"Could not get the image at {url}")
-        # Default image
-        image = "https://static.thenounproject.com/png/2684410-200.png"
+    if parsed["image"] is not None:
+        image = parsed["image"]
+    else:
+        try:
+            image = __get_largest_image_url(soup)
+        except:
+            logging.warning(f"Could not get the image at {url}")
+            # Default image
+            image = "https://static.thenounproject.com/png/2684410-200.png"
 
     # Get the description
-    try:
-        description = soup.find("meta", attrs={"name": "description"})["content"]
-    except:
+    if parsed["description"] is not None:
+        description = parsed["description"]
+    else:
         logging.warning(f"Could not get the description at {url}")
         # Default description
         description = "No description"
 
-    # Get the text
-    text = __extract_mardown(soup, url)
+    text = parsed["text"]
+    text = move_images_to_end_of_paragraphs(text)
 
-    # Compute difficulty
-    difficulty_list = Models.compute_text_difficulty(text)
+    # # Compute difficulty
+    # TODO: Compute difficulty
+    # difficulty_list = Models.compute_text_difficulty(text)
 
     # Add the article
     __add_article(url, title, image, description, text)
 
 
 def get_article(article_id: int):
-    # TODO : Add pdoc3
+    """Get an article from the database.
+
+    Args:
+        article_id (int): The id of the article.
+
+    Returns:
+        dict: The article.
+    """
     df = pd.read_json(path)
 
     try:
@@ -152,44 +173,6 @@ def __make_links_absolute(soup, base_url):
     return soup
 
 
-def __extract_mardown(soup: BeautifulSoup, url: str):
-    """Convert a soup to markdown.
-
-    Args:
-        soup (BeautifulSoup): The soup to convert.
-        url (str): The url of the page.
-
-    Returns:
-        str: The markdown.
-    """
-    # Remove meta tags
-    for meta in soup.find_all("meta"):
-        meta.decompose()
-    # Remove script tags
-    for script in soup.find_all("script"):
-        script.decompose()
-    # Remove style tags
-    for style in soup.find_all("style"):
-        style.decompose()
-    # Remove comments
-    for comment in soup.find_all(
-        text=lambda text: isinstance(text, bs4.element.Comment)
-    ):
-        comment.extract()
-    # Remove hidden inputs
-    for hidden in soup.find_all(type="hidden"):
-        hidden.decompose()
-
-    # Remove empty tags
-    for empty in soup.find_all(lambda tag: not tag.contents):
-        empty.decompose()
-
-    # Convert to markdown
-    markdown_content = md.MarkdownConverter().convert_soup(soup)
-
-    return markdown_content
-
-
 def __get_largest_image_url(soup: BeautifulSoup):
     """Get the largest image url from a soup.
 
@@ -229,6 +212,36 @@ def __get_largest_image_url(soup: BeautifulSoup):
             pass
 
     return largest_image_url
+
+
+def move_images_to_end_of_paragraphs(markdown_text: str):
+    # Regular expression to find Markdown images
+    image_regex = r"!\[.*?\]\(.*?\)"
+
+    # Split the text into paragraphs
+    split_regex = r"\n{2,}|(?<=\n)#+"
+    paragraphs = re.split(split_regex, markdown_text)
+
+    # Initialize a list to store the modified paragraphs
+    modified_paragraphs = []
+
+    for paragraph in paragraphs:
+        # Find all images in the paragraph
+        images = re.findall(image_regex, paragraph)
+
+        # Remove the images from the paragraph
+        modified_paragraph = re.sub(image_regex, "", paragraph)
+
+        # Append the images to the end of the paragraph
+        modified_paragraph += "\n\n" + "\n\n".join(images)
+
+        # Add the modified paragraph to the list
+        modified_paragraphs.append(modified_paragraph)
+
+    # Reconstruct the text with the modified paragraphs
+    modified_text = "\n\n".join(modified_paragraphs)
+
+    return modified_text
 
 
 def get_article_database_length():

@@ -56,7 +56,6 @@ def simplify_sentences(sentences: List[str], model: str = "mistral-7B"):
     Returns:
         List[str]: The simplified sentences.
     """
-    # TODO: check if I am well using my mistral and not vigostral, because results are not good
     # Estimate difficulty
     inputs = pd.DataFrame(columns=["Sentence", "Difficulty"])
     inputs["Sentence"] = sentences
@@ -367,7 +366,7 @@ if Config.simplification:
     mistral_tokenizer = __download_tokenizer()
 
 # Load the OpenAI models
-connect_to_openai()
+# connect_to_openai()
 
 print("Models loaded successfully.")
 
