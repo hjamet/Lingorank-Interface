@@ -18,6 +18,8 @@ def layout(article_id):
         logging.error(f"The article with id {article_id} does not exist.")
         return dmc.Text(children="The article does not exist.")
 
+    # Add Difficulty Graph
+
     # Title
     title = dmc.Title(children=article["title"], order=1)
 

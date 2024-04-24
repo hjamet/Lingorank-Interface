@@ -55,6 +55,9 @@ def add_article_from_url(url: str):
         include_images=True,
         favor_precision=True,
     )
+    if parsed is None:
+        logging.error(f"Could not parse the page at {url}")
+        return
 
     # Get the title
     if parsed["title"] is not None:

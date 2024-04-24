@@ -31,9 +31,18 @@ def compute_text_difficulty(text: str):
     """
     # Split by sentences
     tokenizer = nltk.data.load("tokenizers/punkt/french.pickle")
+    sentences = tokenizer.tokenize(text)
+
+    # Remove too long sentences
+    max_tokens = difficulty_estimation_pipeline.tokenizer.model_max_length
+    short_sentences = [
+        sentence
+        for sentence in sentences
+        if len(difficulty_estimation_pipeline.tokenizer.encode(sentence)) <= max_tokens
+    ]
 
     # Compute difficulty of each sentence
-    sentence_difficulties = compute_sentences_difficulty(tokenizer.tokenize(text))
+    sentence_difficulties = compute_sentences_difficulty(short_sentences)
 
     # Compute average difficulty per column
     average_difficulty = [sum(col) / len(col) for col in zip(*sentence_difficulties)]
@@ -352,6 +361,11 @@ if Config.difficulty_estimation:
         device=device,
         tokenizer=bert_tokenizer,
         top_k=None,
+    )
+
+    # Set max token length
+    difficulty_estimation_pipeline.tokenizer.model_max_length = (
+        difficulty_estimation_pipeline.model.config.max_position_embeddings
     )
 
 # Load the sentence simplification model
