@@ -34,6 +34,7 @@ def layout():
     )
 
     # Add url button
+    # TODO : Permettre l'ajout d'un texte à la place d'une URL
     add_url_button = dmc.Button(
         children="Add URL",
         color="blue",

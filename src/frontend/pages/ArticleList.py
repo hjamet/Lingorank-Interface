@@ -2,6 +2,7 @@ import dash
 import dash_mantine_components as dmc
 
 import src.backend.ArticleDatabase as ArticleDatabase
+import src.Config as Config
 
 
 def layout():
@@ -78,14 +79,7 @@ def __create_card(article: dict):
 
     # Get estimated difficulty
     difficulty = max(["A1", "A2", "B1", "B2", "C1", "C2"], key=lambda x: article[x])
-    difficulty_color = {
-        "A1": "lime",
-        "A2": "blue",
-        "B1": "violet",
-        "B2": "yellow",
-        "C1": "orange",
-        "C2": "red",
-    }[difficulty]
+    difficulty_color = Config.difficulty_colors[difficulty]
 
     # Estimated reading time
     reading_time = len(article["text"]) // 1000
