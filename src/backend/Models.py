@@ -21,8 +21,24 @@ import nltk.data
 
 
 def compute_text_difficulty(text: str):
+    """Compute the average difficulty of text by analyzing each sentence.
+
+    Args:
+        text (str): The text to analyze, expected in French.
+
+    Returns:
+        list: A list containing the average difficulty score for each difficulty level. (A1, A2, B1, B2, C1, C2)
+    """
+    # Split by sentences
     tokenizer = nltk.data.load("tokenizers/punkt/french.pickle")
-    return compute_sentences_difficulty(tokenizer.tokenize(text))
+
+    # Compute difficulty of each sentence
+    sentence_difficulties = compute_sentences_difficulty(tokenizer.tokenize(text))
+
+    # Compute average difficulty per column
+    average_difficulty = [sum(col) / len(col) for col in zip(*sentence_difficulties)]
+
+    return average_difficulty
 
 
 def compute_sentences_difficulty(sentences: List[str]):
@@ -32,18 +48,16 @@ def compute_sentences_difficulty(sentences: List[str]):
         sentence (List[str]): A list of sentences in French.
 
     Returns:
-        List[str]: The estimated difficulties of the sentences.
+        List[List [float]]: The probabilities of each label for each sentence. (A1, A2, B1, B2, C1, C2)
     """
-    predictions = difficulty_estimation_pipeline(sentences)
-    labels_map = {
-        "LABEL_0": "A1",
-        "LABEL_1": "A2",
-        "LABEL_2": "B1",
-        "LABEL_3": "B2",
-        "LABEL_4": "C1",
-        "LABEL_5": "C2",
-    }
-    return [labels_map[prediction["label"]] for prediction in predictions]
+    predictions_logits = difficulty_estimation_pipeline(sentences)
+
+    # Rename labels and prepare the output
+    results = [
+        [l["score"] for l in sorted(sentence, key=lambda l: l["label"])]
+        for sentence in predictions_logits
+    ]
+    return results
 
 
 def simplify_sentences(sentences: List[str], model: str = "mistral-7B"):
@@ -337,6 +351,7 @@ if Config.difficulty_estimation:
         model="OloriBern/Lingorank_Bert_french_difficulty",
         device=device,
         tokenizer=bert_tokenizer,
+        top_k=None,
     )
 
 # Load the sentence simplification model

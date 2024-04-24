@@ -87,11 +87,10 @@ def add_article_from_url(url: str):
     text = move_images_to_end_of_paragraphs(text)
 
     # # Compute difficulty
-    # TODO: Compute difficulty
-    # difficulty_list = Models.compute_text_difficulty(text)
+    difficulty_list = Models.compute_text_difficulty(text)
 
     # Add the article
-    __add_article(url, title, image, description, text)
+    __add_article(url, title, image, description, text, difficulty_list)
 
 
 def get_article(article_id: int):
@@ -111,7 +110,9 @@ def get_article(article_id: int):
         logging.error(f"The article with id {article_id} does not exist.")
 
 
-def __add_article(url: str, title: str, image: str, description: str, text: str):
+def __add_article(
+    url: str, title: str, image: str, description: str, text: str, difficulty: list
+):
     """Add an article to the database.
 
     Args:
@@ -120,24 +121,27 @@ def __add_article(url: str, title: str, image: str, description: str, text: str)
         image (str): The image of the article.
         description (str): The description of the article.
         text (str): The text of the article.
+        difficulty (list): The mean difficulty of the article for every label (A1, A2, B1, B2, C1, C2)
     """
     # Load the database
     df = pd.read_json(path)
 
     # Add the article
+    article = {
+        "article_id": len(df),
+        "url": [url],
+        "title": [title],
+        "image": [image],
+        "description": [description],
+        "text": [text],
+    }
+    article.update(
+        {["A1", "A2", "B1", "B2", "C1", "C2"][i]: [difficulty[i]] for i in range(6)}
+    )
     df = pd.concat(
         [
             df,
-            pd.DataFrame(
-                {
-                    "article_id": len(df),
-                    "url": [url],
-                    "title": [title],
-                    "image": [image],
-                    "description": [description],
-                    "text": [text],
-                }
-            ),
+            pd.DataFrame(article),
         ]
     )
 
