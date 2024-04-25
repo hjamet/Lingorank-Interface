@@ -104,9 +104,9 @@ def add_article_from_text(text: str):
         text (str): The text of the article.
     """
     # Create metadata
-    title = text[:25] + "..."
+    title = text[:25] + ("..." if len(text) > 25 else "")
     image = "https://cdn-icons-png.flaticon.com/512/2911/2911230.png"
-    description = text
+    description = text[:300] + ("..." if len(text) > 300 else "")
     difficulty_list = Models.compute_text_difficulty(text)
 
     __add_article("text", title, image, description, text, difficulty_list)

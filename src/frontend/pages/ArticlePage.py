@@ -20,8 +20,11 @@ def layout(article_id):
         logging.error(f"The article with id {article_id} does not exist.")
         return dmc.Text(children="The article does not exist.")
 
-    # TODO: Add Difficulty Graph
+    # TODO: Smaller, explanation when hover
     # Spider graph
+    # TODO: Add new graph on simplified text
+    # TODO Add video
+    # TODO : Add search
     ## Get data
     labels = ["A1", "A2", "B1", "B2", "C1", "C2"]
     values = [article[label] for label in labels]
@@ -37,7 +40,7 @@ def layout(article_id):
         )
     )
     fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True)),
+        polar=dict(radialaxis=dict(visible=False)),
         showlegend=False,
     )
     ## Graph

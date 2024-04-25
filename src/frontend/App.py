@@ -109,7 +109,7 @@ def layout():
     text_modal_stack = dmc.Stack(
         children=[text_input, submit_text_button],
         spacing="xl",
-        align="flex-end",
+        align="center",
     )
     ## Create modal
     text_modal = dmc.Modal(
@@ -117,12 +117,15 @@ def layout():
         title="Add Text",
         id="add-text-modal",
         centered=True,
+        size="50%",
     )
 
     # Creat Header
     header = dmc.Header(
         children=[top_bar, url_modal, text_modal], height=50, withBorder=True
     )
+
+    # Create some space
 
     # Create content container
     content = dash.page_container

@@ -97,6 +97,7 @@ def __create_card(article: dict):
         reading_time_color = "red"
 
     # Title & Difficulty
+    # TODO Same card size everywhere
     title_difficulty_readtime = dmc.Group(
         [
             dmc.Text(article["title"], weight=500),
@@ -106,7 +107,9 @@ def __create_card(article: dict):
                         difficulty, color=difficulty_color, variant="filled", size="lg"
                     ),
                     dmc.Badge(
-                        f"~{reading_time}m", color=reading_time_color, variant="dot"
+                        f"~{reading_time} minutes",
+                        color=reading_time_color,
+                        variant="dot",
                     ),
                 ],
                 align="center",
@@ -143,7 +146,8 @@ def __create_card(article: dict):
             title_difficulty_readtime,
             description,
             read_button,
-        ]
+        ],
+        shadow="md",
     )
 
     return card
