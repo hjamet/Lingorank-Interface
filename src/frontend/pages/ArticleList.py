@@ -102,7 +102,9 @@ def __create_card(article: dict):
             dmc.Text(article["title"], weight=500),
             dmc.Stack(
                 [
-                    dmc.Badge(difficulty, color=difficulty_color, variant="filled"),
+                    dmc.Badge(
+                        difficulty, color=difficulty_color, variant="filled", size="lg"
+                    ),
                     dmc.Badge(
                         f"~{reading_time}m", color=reading_time_color, variant="dot"
                     ),

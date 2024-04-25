@@ -53,6 +53,7 @@ def add_article_from_url(url: str):
         url=url,
         include_formatting=True,
         include_images=True,
+        include_links=True,
         favor_precision=True,
     )
     if parsed is None:
@@ -94,6 +95,21 @@ def add_article_from_url(url: str):
 
     # Add the article
     __add_article(url, title, image, description, text, difficulty_list)
+
+
+def add_article_from_text(text: str):
+    """Add an article from text to the database.
+
+    Args:
+        text (str): The text of the article.
+    """
+    # Create metadata
+    title = text[:25] + "..."
+    image = "https://cdn-icons-png.flaticon.com/512/2911/2911230.png"
+    description = text
+    difficulty_list = Models.compute_text_difficulty(text)
+
+    __add_article("text", title, image, description, text, difficulty_list)
 
 
 def get_article(article_id: int):
