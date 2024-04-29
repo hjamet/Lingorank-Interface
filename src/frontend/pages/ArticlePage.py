@@ -64,6 +64,7 @@ def layout(article_id):
         position="center",
         spacing="xl",
         style={"marginTop": "5rem", "marginBottom": "5rem"},
+        id="article-card-graph",
     )
 
     # Accordion
@@ -155,13 +156,19 @@ def __create_accordion(article: dict, value: str):
 
 
 @dash.callback(
-    dash.dependencies.Output("article-difficulty-graph", "figure"),
+    dash.dependencies.Output("article-card-graph", "children"),
     dash.dependencies.Output("simplify-button-container", "children"),
     dash.dependencies.Input("article-accordion", "value"),
+    dash.dependencies.State("article-card-graph", "children"),
 )
-def update_graph(accordion_value: str):
+def update_graph(accordion_value: str, article_card_graph_children):
     if accordion_value is None:
-        return None, []
+        article_card_graph_children = (
+            [article_card_graph_children[1]]
+            if len(article_card_graph_children) == 2
+            else article_card_graph_children
+        )
+        return article_card_graph_children, []
 
     # Get infos from accordion value
     article_id, article_label, simplification_id = accordion_value.split(":")
@@ -208,13 +215,30 @@ def update_graph(accordion_value: str):
             name=article_label,
         )
     )
-
     fig.update_layout(
         polar=dict(radialaxis=dict(visible=False)),
         showlegend=False,
     )
+    ## Graph
+    graph = dash.dcc.Graph(
+        figure=fig, id="article-difficulty-graph", config={"displayModeBar": False}
+    )
+    ## Update children
+    if len(article_card_graph_children) == 2:
+        article_card_graph_children[0] = graph
+    else:
+        article_card_graph_children = [graph, article_card_graph_children[0]]
 
-    return fig, simplify_button
+    return article_card_graph_children, simplify_button
+
+
+# @dash.callback(
+#     dash.dependencies.Output("article-accordion", "children"),
+#     dash.dependencies.Input("simplify-button", "n_clicks"),
+#     dash.dependencies.State("article-accordion", "value"),
+#     dash.dependencies.State("article-accordion", "children"),
+# )
+# def simplify_text(n_clicks, accordion_value, accordion_children):
 
 
 # ---------------------------------------------------------------------------- #
