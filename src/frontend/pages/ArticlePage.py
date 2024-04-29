@@ -20,14 +20,13 @@ def layout(article_id):
         logging.error(f"The article with id {article_id} does not exist.")
         return dmc.Text(children="The article does not exist.")
 
-    # TODO: Smaller, explanation when hover
     # Spider graph
     # TODO: Add new graph on simplified text
     # TODO Add video
     # TODO : Add search
     ## Get data
     labels = ["A1", "A2", "B1", "B2", "C1", "C2"]
-    values = [article[label] for label in labels]
+    values = [round(article[label] * 100, 0) for label in labels]
     ## Create figure
     fig = go.Figure(
         go.Scatterpolar(
@@ -37,6 +36,8 @@ def layout(article_id):
             marker=dict(
                 color=Config.difficulty_colors[max(labels, key=lambda x: article[x])]
             ),
+            hovertemplate="Ce texte a %{r}% d'être de niveau %{theta}.<extra></extra>",
+            showlegend=False,
         )
     )
     fig.update_layout(
@@ -45,8 +46,7 @@ def layout(article_id):
     )
     ## Graph
     graph = dash.dcc.Graph(
-        figure=fig,
-        id="article-difficulty-graph",
+        figure=fig, id="article-difficulty-graph", config={"displayModeBar": False}
     )
 
     # Title

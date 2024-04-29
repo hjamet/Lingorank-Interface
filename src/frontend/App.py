@@ -1,8 +1,6 @@
 import flask
 import dash
 import dash_mantine_components as dmc
-import re
-import logging
 import os
 import src.Config as Config
 

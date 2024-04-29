@@ -97,7 +97,6 @@ def __create_card(article: dict):
         reading_time_color = "red"
 
     # Title & Difficulty
-    # TODO Same card size everywhere
     title_difficulty_readtime = dmc.Group(
         [
             dmc.Text(article["title"], weight=500),
