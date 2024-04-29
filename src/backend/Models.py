@@ -268,6 +268,7 @@ import signal, time
 
 # Connect to OpenAI
 def connect_to_openai():
+
     try:
         with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "r") as f:
             openai_key = f.read()

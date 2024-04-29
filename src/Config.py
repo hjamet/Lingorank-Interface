@@ -27,5 +27,5 @@ difficulty_colors = {
 #                                    STATIC                                    #
 # ---------------------------------------------------------------------------- #
 pwd = git.Repo(os.getcwd(), search_parent_directories=True).working_tree_dir
-title_length = 100
-description_length = 400
+title_length = 60
+description_length = 300

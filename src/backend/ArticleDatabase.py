@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from io import BytesIO
 from urllib.parse import urljoin
 
@@ -11,15 +12,15 @@ from PIL import Image
 
 import src.backend.Models as Models
 import src.Config as Config
-import re
 
-# Path to the database
-path = os.path.join(Config.pwd, "data/articles.json")
+# Path to the databases
+article_database_path = os.path.join(Config.pwd, "data/articles.json")
+simplication_database_path = os.path.join(Config.pwd, "data/simplifications.json")
 
 # Create the database if it doesn't exist
-if not os.path.exists(path):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
+if not os.path.exists(article_database_path):
+    os.makedirs(os.path.dirname(article_database_path), exist_ok=True)
+    with open(article_database_path, "w") as f:
         pd.DataFrame(columns=["url", "title", "image", "description", "text"]).to_json(
             f, orient="records"
         )
@@ -27,7 +28,7 @@ if not os.path.exists(path):
 
 def add_article_from_url(url: str):
     # Check if url not already in database
-    df = pd.read_json(path)
+    df = pd.read_json(article_database_path)
     if not df.empty and url in df["url"].values:
         logging.warning(f"The url {url} is already in the database.")
         return
@@ -121,12 +122,50 @@ def get_article(article_id: int):
     Returns:
         dict: The article.
     """
-    df = pd.read_json(path)
+    try:
+        df = pd.read_json(article_database_path)
+    except:
+        logging.error("The database is corrupted or empty.")
+        return
 
     try:
         return df[df["article_id"] == article_id].iloc[0].to_dict()
     except:
         logging.error(f"The article with id {article_id} does not exist.")
+
+
+def get_simplification(article: dict, simplification_id: int):
+    """Get a simplification version of the article.
+
+    Args:
+        article (dict): The article.
+        simplification_id (int): The id of the simplification. (The higher the id, the more simplified the text)
+
+    Returns:
+        dict: The simplified article.
+    """
+    # Load the database
+    try:
+        df = pd.read_json(simplication_database_path)
+    except:
+        logging.error("The database is corrupted or empty.")
+        return
+
+    # Get the simplification
+    try:
+        article_simplifications = df[(df["article_id"] == article["article_id"])]
+        return article_simplifications.iloc[simplification_id].to_dict()
+    except:
+        logging.info(
+            f"The simplification with id {simplification_id} does not exist. Creating it."
+        )
+        # TODO Link Simplification using model
+        text = article["text"]
+        difficulty_list = Models.compute_text_difficulty(text)
+
+        __add_simplification(
+            article_id=article["article_id"], text=text, difficulty=difficulty_list
+        )
 
 
 def __add_article(
@@ -143,7 +182,7 @@ def __add_article(
         difficulty (list): The mean difficulty of the article for every label (A1, A2, B1, B2, C1, C2)
     """
     # Load the database
-    df = pd.read_json(path)
+    df = pd.read_json(article_database_path)
 
     # Add the article
     article = {
@@ -171,11 +210,53 @@ def __add_article(
     )
 
     # Save the database
-    df.to_json(path, orient="records")
+    df.to_json(article_database_path, orient="records")
 
     # Check if the database is not corrupted
     try:
-        pd.read_json(path)
+        pd.read_json(article_database_path)
+    except:
+        logging.error("The database is corrupted.")
+
+    return
+
+
+def __add_simplification(article_id: int, text: str, difficulty: list):
+    """Add a simplification to the database.
+
+    Args:
+        article_id (int): The id of the article.
+        text (str): The text of the simplification.
+        difficulty (list): The mean difficulty of the simplification for every label (A1, A2, B1, B2, C1, C2)
+    """
+    # Load the database
+    try:
+        df = pd.read_json(simplication_database_path)
+    except:
+        logging.warning("The database is corrupted or empty. Creating it.")
+        df = pd.DataFrame(columns=["article_id", "text"])
+
+    # Add the simplification
+    simplification = {
+        "article_id": [article_id],
+        "text": [text],
+    }
+    simplification.update(
+        {["A1", "A2", "B1", "B2", "C1", "C2"][i]: [difficulty[i]] for i in range(6)}
+    )
+    df = pd.concat(
+        [
+            df,
+            pd.DataFrame(simplification),
+        ]
+    )
+
+    # Save the database
+    df.to_json(simplication_database_path, orient="records")
+
+    # Check if the database is not corrupted
+    try:
+        pd.read_json(simplication_database_path)
     except:
         logging.error("The database is corrupted.")
 
@@ -274,4 +355,4 @@ def move_images_to_end_of_paragraphs(markdown_text: str):
 
 
 def get_article_database_length():
-    return len(pd.read_json(path))
+    return len(pd.read_json(article_database_path))
