@@ -134,12 +134,16 @@ def get_article(article_id: int):
         logging.error(f"The article with id {article_id} does not exist.")
 
 
-def get_simplification(article_id: int, simplification_id: int):
+def get_simplification(
+    article_id: int, simplification_id: int, model_to_use: str = None
+):
     """Get a simplification version of the article.
 
     Args:
         article (int): The id of the article.
         simplification_id (int): The id of the simplification. (The higher the id, the more simplified the text)
+        model_to_use (str): The model to use for the simplification. Default is None. Possible values:
+            - "model id" (str): for openai models
 
     Returns:
         dict: The simplified article.
@@ -163,6 +167,12 @@ def get_simplification(article_id: int, simplification_id: int):
             f"The simplification with id {simplification_id} does not exist. Creating it."
         )
         # TODO Link Simplification using model
+        if model_to_use is not None:
+            model_to_use = list(Models.list_available_models().values())[
+                0
+            ].fine_tuned_model
+        else:
+            model_to_use = Models.list_available_models()[model_to_use].fine_tuned_model
         text = article["text"]
         difficulty_list = Models.compute_text_difficulty(text)
 

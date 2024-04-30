@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import src.backend.ArticleDatabase as ArticleDatabase
 import src.Config as Config
 from src.frontend.helpers import pages as pages
+import src.backend.Models as Models
 
 
 def layout(article_id):
@@ -85,41 +86,42 @@ def layout(article_id):
         "C1": "B1",
         "C2": "B1",
     }
-    simplify_button = dmc.Center(
+    simplify_button = dmc.Button(
+        children=f"Simplify to {simplify_map[article_label]}",
+        variant="gradient",
+        gradient={
+            "from": Config.difficulty_colors[article_label],
+            "to": Config.difficulty_colors[simplify_map[article_label]],
+        },
+        size="xl",
+        id="simplify-button",
+    )
+    simplify_menu = dmc.Center(
         dmc.Menu(
             [
                 dmc.MenuTarget(
                     dmc.Container(
-                        dmc.Button(
-                            children=f"Simplify to {simplify_map[article_label]}",
-                            variant="gradient",
-                            gradient={
-                                "from": Config.difficulty_colors[article_label],
-                                "to": Config.difficulty_colors[
-                                    simplify_map[article_label]
-                                ],
-                            },
-                            size="xl",
-                            id="simplify-button",
-                        ),
+                        simplify_button,
                         id="simplify-button-container",
                     )
                 ),
                 dmc.MenuDropdown(
                     [
-                        dmc.MenuItem("test"),
-                        dmc.MenuItem("test"),
+                        dmc.MenuItem(key, id="model-button")
+                        for key, value in Models.list_available_models().items()
                     ]
                 ),
             ],
             trigger="hover",
+            transition={"transition": "rotate-right", "duration": 150},
+            position="right",
         ),
         style={"marginTop": "5rem", "marginBottom": "5rem"},
     )
 
     # Container
     layout = dmc.Container(
-        children=[article_card_graph, accordion, simplify_button],
+        children=[article_card_graph, accordion, simplify_menu],
         id="article-layout",
         size="80%",
     )
@@ -255,33 +257,43 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
     dash.dependencies.Output("article-accordion", "children"),
     dash.dependencies.Output("article-accordion", "value"),
     dash.dependencies.Input("simplify-button", "n_clicks"),
+    dash.dependencies.Input("model-button", "children"),
+    dash.dependencies.Input("model-button", "n_clicks"),
     dash.dependencies.State("article-accordion", "value"),
     dash.dependencies.State("article-accordion", "children"),
+    prevent_initial_call=True,
 )
-def call_simplify_text(n_clicks, accordion_value, accordion_children):
-    if n_clicks is None:
-        return dash.no_update, dash.no_update
-
+def call_simplify_text(
+    n_clicks, menu_button, menu_button_n_clicks, accordion_value, accordion_children
+):
     # Get infos from accordion value
-    if accordion_value is None:
+    if accordion_value is None or (n_clicks is None and menu_button_n_clicks is None):
         return dash.no_update, dash.no_update
     article_id, article_label, simplification_id = accordion_value.split(":")
 
     # Get current position in accordion
     current_position = int(simplification_id)
-    ## Return next already loaded simplification
+    # Return next already loaded simplification
     if current_position + 1 < len(accordion_children):
         return (
             accordion_children,
             accordion_children[current_position + 1]["props"]["value"],
         )
-    ## Create new simplification and return it
+    # Create new simplification and return it
     else:
-        ## Create new simplification
+        # Determine the model to use
+        if n_clicks:
+            model_name = menu_button
+        else:
+            model_name = None
+
+        # Create new simplification
         simplification = ArticleDatabase.get_simplification(
-            article_id=int(article_id), simplification_id=current_position
+            article_id=int(article_id),
+            simplification_id=current_position,
+            model_to_use=model_name,
         )
-        ## Update accordion
+        # Update accordion
         simplification_label = max(
             simplification,
             key=lambda x: (

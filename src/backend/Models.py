@@ -1,25 +1,25 @@
-from typing import NamedTuple
-from typing import List
+import json
+import logging
 import os
-import git
+from collections import namedtuple
+from typing import List
+
+import nltk.data
+import pandas as pd
 import torch
-from peft import PeftModel, PeftConfig
+from datasets import Dataset
+from peft import PeftConfig, PeftModel
+from torch.utils.data import DataLoader
+from tqdm import tqdm as console_tqdm
 from transformers import (
     AutoModelForCausalLM,
-    BitsAndBytesConfig,
     AutoTokenizer,
+    BitsAndBytesConfig,
     CamembertTokenizer,
     pipeline,
 )
-from datasets import Dataset
-import pandas as pd
-import logging
-import torch
-from tqdm import tqdm as console_tqdm
-from torch.utils.data import DataLoader
+
 import src.Config as Config
-import nltk.data
-import json
 
 openai_models_path = os.path.join(Config.pwd, "data", "models")
 
@@ -263,11 +263,14 @@ def __encode_dataset(dataset: Dataset, tokenizer: AutoTokenizer):
 
 # ------------------------- PRIVATE OPENAI FUNCTIONS ------------------------- #
 
-# ----------------------- ZERO-SHOT EVALUATION FUNCTION ---------------------- #
-from tqdm import notebook as notebook_tqdm
+import signal
+import time
+
 import openai
 import pandas as pd
-import signal, time
+
+# ----------------------- ZERO-SHOT EVALUATION FUNCTION ---------------------- #
+from tqdm import notebook as notebook_tqdm
 
 
 # Connect to OpenAI
@@ -349,13 +352,9 @@ def list_available_models():
     # OpenAI models
     for file in os.listdir(openai_models_path):
         model_json = json.load(open(os.path.join(openai_models_path, file)))
-        models[model_json["model"]["model"]] = NamedTuple(
-            "OpenAIModel",
-            [
-                ("model", model_json["model"]["model"]),
-                ("fine_tuned_model", model_json["model"]["fine_tuned_model"]),
-            ],
-        )
+        models[model_json["model"]["model"]] = namedtuple(
+            "Model", ["model", "fine_tuned_model"]
+        )(model_json["model"]["model"], model_json["model"]["fine_tuned_model"])
 
     return models
 
