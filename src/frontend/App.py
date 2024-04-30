@@ -124,12 +124,13 @@ def layout():
     )
 
     # Create some space
+    space = dmc.Container(style={"height": "50px"})
 
     # Create content container
     content = dash.page_container
 
     # Add components to the layout
-    layout.children.extend([header, content])
+    layout.children.extend([header, space, content])
 
     # Return the layout
     return layout
