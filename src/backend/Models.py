@@ -1,3 +1,4 @@
+from typing import NamedTuple
 from typing import List
 import os
 import git
@@ -18,6 +19,9 @@ from tqdm import tqdm as console_tqdm
 from torch.utils.data import DataLoader
 import src.Config as Config
 import nltk.data
+import json
+
+openai_models_path = os.path.join(Config.pwd, "data", "models")
 
 
 def compute_text_difficulty(text: str):
@@ -339,7 +343,22 @@ def evaluate_openai(inputs: pd.Series, model: str, context: str):
     return pd.DataFrame(predictions)
 
 
-# import
+def list_available_models():
+    models = {}
+
+    # OpenAI models
+    for file in os.listdir(openai_models_path):
+        model_json = json.load(open(os.path.join(openai_models_path, file)))
+        models[model_json["model"]["model"]] = NamedTuple(
+            "OpenAIModel",
+            [
+                ("model", model_json["model"]["model"]),
+                ("fine_tuned_model", model_json["model"]["fine_tuned_model"]),
+            ],
+        )
+
+    return models
+
 
 # ---------------------------------------------------------------------------- #
 #                                INITIALIZATION                                #

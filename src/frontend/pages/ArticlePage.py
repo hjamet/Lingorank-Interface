@@ -10,6 +10,8 @@ from src.frontend.helpers import pages as pages
 
 
 def layout(article_id):
+    # TODO Add Stepper to navigate between simplifications
+
     # Check if article_id is an integer
     try:
         article_id = int(article_id)
@@ -23,7 +25,6 @@ def layout(article_id):
         return dmc.Text(children="The article does not exist.")
 
     # Spider graph
-    # TODO: Add new graph on simplified text
     # TODO Add video
     # TODO : Add search
     ## Get data
@@ -85,18 +86,35 @@ def layout(article_id):
         "C2": "B1",
     }
     simplify_button = dmc.Center(
-        dmc.Button(
-            children=f"Simplify to {simplify_map[article_label]}",
-            variant="gradient",
-            gradient={
-                "from": Config.difficulty_colors[article_label],
-                "to": Config.difficulty_colors[simplify_map[article_label]],
-            },
-            size="xl",
-            id="simplify-button",
+        dmc.Menu(
+            [
+                dmc.MenuTarget(
+                    dmc.Container(
+                        dmc.Button(
+                            children=f"Simplify to {simplify_map[article_label]}",
+                            variant="gradient",
+                            gradient={
+                                "from": Config.difficulty_colors[article_label],
+                                "to": Config.difficulty_colors[
+                                    simplify_map[article_label]
+                                ],
+                            },
+                            size="xl",
+                            id="simplify-button",
+                        ),
+                        id="simplify-button-container",
+                    )
+                ),
+                dmc.MenuDropdown(
+                    [
+                        dmc.MenuItem("test"),
+                        dmc.MenuItem("test"),
+                    ]
+                ),
+            ],
+            trigger="hover",
         ),
         style={"marginTop": "5rem", "marginBottom": "5rem"},
-        id="simplify-button-container",
     )
 
     # Container
@@ -115,6 +133,7 @@ def layout(article_id):
 
 
 def __create_accordion(article: dict, value: str):
+    # TODO Improve visual of title with badges
     # Get infos from accordion value
     article_id, article_label, simplification_id = value.split(":")
 
