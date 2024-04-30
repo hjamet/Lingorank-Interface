@@ -134,11 +134,11 @@ def get_article(article_id: int):
         logging.error(f"The article with id {article_id} does not exist.")
 
 
-def get_simplification(article: dict, simplification_id: int):
+def get_simplification(article_id: int, simplification_id: int):
     """Get a simplification version of the article.
 
     Args:
-        article (dict): The article.
+        article (int): The id of the article.
         simplification_id (int): The id of the simplification. (The higher the id, the more simplified the text)
 
     Returns:
@@ -148,8 +148,11 @@ def get_simplification(article: dict, simplification_id: int):
     try:
         df = pd.read_json(simplication_database_path)
     except:
-        logging.error("The database is corrupted or empty.")
-        return
+        logging.warning("The database is corrupted or empty. Creating it.")
+        df = pd.DataFrame(columns=["article_id", "text"])
+
+    # Get the article
+    article = get_article(article_id)
 
     # Get the simplification
     try:
@@ -163,9 +166,9 @@ def get_simplification(article: dict, simplification_id: int):
         text = article["text"]
         difficulty_list = Models.compute_text_difficulty(text)
 
-        __add_simplification(
-            article_id=article["article_id"], text=text, difficulty=difficulty_list
-        )
+        __add_simplification(article=article, text=text, difficulty=difficulty_list)
+
+        return get_simplification(article_id, simplification_id)
 
 
 def __add_article(
@@ -221,11 +224,11 @@ def __add_article(
     return
 
 
-def __add_simplification(article_id: int, text: str, difficulty: list):
+def __add_simplification(article: dict, text: str, difficulty: list):
     """Add a simplification to the database.
 
     Args:
-        article_id (int): The id of the article.
+        article_id (dict): The article to simplify.
         text (str): The text of the simplification.
         difficulty (list): The mean difficulty of the simplification for every label (A1, A2, B1, B2, C1, C2)
     """
@@ -238,8 +241,9 @@ def __add_simplification(article_id: int, text: str, difficulty: list):
 
     # Add the simplification
     simplification = {
-        "article_id": [article_id],
+        "article_id": [article["article_id"]],
         "text": [text],
+        "title": [article["title"]],
     }
     simplification.update(
         {["A1", "A2", "B1", "B2", "C1", "C2"][i]: [difficulty[i]] for i in range(6)}

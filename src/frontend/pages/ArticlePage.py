@@ -161,7 +161,7 @@ def __create_accordion(article: dict, value: str):
     dash.dependencies.Input("article-accordion", "value"),
     dash.dependencies.State("article-card-graph", "children"),
 )
-def update_graph(accordion_value: str, article_card_graph_children):
+def call_update_graph(accordion_value: str, article_card_graph_children):
     if accordion_value is None:
         article_card_graph_children = (
             [article_card_graph_children[1]]
@@ -232,13 +232,53 @@ def update_graph(accordion_value: str, article_card_graph_children):
     return article_card_graph_children, simplify_button
 
 
-# @dash.callback(
-#     dash.dependencies.Output("article-accordion", "children"),
-#     dash.dependencies.Input("simplify-button", "n_clicks"),
-#     dash.dependencies.State("article-accordion", "value"),
-#     dash.dependencies.State("article-accordion", "children"),
-# )
-# def simplify_text(n_clicks, accordion_value, accordion_children):
+@dash.callback(
+    dash.dependencies.Output("article-accordion", "children"),
+    dash.dependencies.Output("article-accordion", "value"),
+    dash.dependencies.Input("simplify-button", "n_clicks"),
+    dash.dependencies.State("article-accordion", "value"),
+    dash.dependencies.State("article-accordion", "children"),
+)
+def call_simplify_text(n_clicks, accordion_value, accordion_children):
+    if n_clicks is None:
+        return dash.no_update, dash.no_update
+
+    # Get infos from accordion value
+    if accordion_value is None:
+        return dash.no_update, dash.no_update
+    article_id, article_label, simplification_id = accordion_value.split(":")
+
+    # Get current position in accordion
+    current_position = int(simplification_id)
+    ## Return next already loaded simplification
+    if current_position + 1 < len(accordion_children):
+        return (
+            accordion_children,
+            accordion_children[current_position + 1]["props"]["value"],
+        )
+    ## Create new simplification and return it
+    else:
+        ## Create new simplification
+        simplification = ArticleDatabase.get_simplification(
+            article_id=int(article_id), simplification_id=current_position
+        )
+        ## Update accordion
+        simplification_label = max(
+            simplification,
+            key=lambda x: (
+                simplification[x] if x in ["A1", "A2", "B1", "B2", "C1", "C2"] else -1
+            ),
+        )
+        accordion_children.append(
+            __create_accordion(
+                simplification,
+                value=f"{article_id}:{simplification_label}:{current_position+1}",
+            )
+        )
+        return (
+            accordion_children,
+            f"{article_id}:{simplification_label}:{current_position+1}",
+        )
 
 
 # ---------------------------------------------------------------------------- #
