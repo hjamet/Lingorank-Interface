@@ -62,39 +62,18 @@ def layout(article_id):
     ## Get data
     labels = ["A1", "A2", "B1", "B2", "C1", "C2"]
     article_label = max(article, key=lambda x: article[x] if x in labels else -1)
-    values = [round(article[label] * 100, 0) for label in labels]
-    ## Create figure
-    fig = go.Figure(
-        go.Scatterpolar(
-            r=values,
-            theta=labels,
-            fill="toself",
-            marker=dict(color=Config.difficulty_colors[article_label]),
-            hovertemplate="Ce texte a %{r}% d'être de niveau %{theta}.<extra></extra>",
-            showlegend=False,
-            name=article_label,
-        )
-    )
-    fig.update_layout(
-        polar=dict(radialaxis=dict(visible=False)),
-        showlegend=False,
-    )
-    ## Graph
-    graph = dash.dcc.Graph(
-        figure=fig, id="article-difficulty-graph", config={"displayModeBar": False}
-    )
 
     # Article Card
     article_card = pages.create_card(article)
-    article_card.w = "40%"
+    article_card.w = "80%"
 
     # Article Card & Graph
-    article_card_graph = dmc.Group(
+    article_card_graph = dmc.SimpleGrid(
         [
-            graph,
+            dmc.Container(style={"width": "100%"}),
             article_card,
         ],
-        position="center",
+        cols=2,
         spacing="xl",
         style={"marginTop": "5rem", "marginBottom": "5rem"},
         id="article-card-graph",
@@ -147,7 +126,7 @@ def layout(article_id):
             transition={"transition": "rotate-right", "duration": 150},
             position="right",
         ),
-        style={"marginTop": "5rem", "marginBottom": "5rem"},
+        style={"marginTop": "3rem", "marginBottom": "3rem"},
     )
 
     # Container
@@ -250,9 +229,12 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
     article_id, article_label, simplification_id = accordion_value.split(":")
 
     # Load article
-    article = ArticleDatabase.get_simplification(
-        article_id=int(article_id), simplification_id=int(simplification_id)
-    )
+    if simplification_id == "0":
+        article = ArticleDatabase.get_article(int(article_id))
+    else:
+        article = ArticleDatabase.get_simplification(
+            article_id=int(article_id), simplification_id=int(simplification_id)
+        )
 
     # Simplify button
     simplify_map = {
@@ -396,7 +378,6 @@ def call_simplify_text(
             Models.connect_to_openai(openai_key)
         return dash.no_update, dash.no_update, False
     else:
-        logger.error("No button was clicked.")
         return dash.no_update, dash.no_update, dash.no_update
 
 
