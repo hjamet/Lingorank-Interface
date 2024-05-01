@@ -58,6 +58,7 @@ def layout(article_id):
     # Spider graph
     # TODO Add video
     # TODO : Add search
+    # TODO : Bug with incorrect major label
     ## Get data
     labels = ["A1", "A2", "B1", "B2", "C1", "C2"]
     article_label = max(article, key=lambda x: article[x] if x in labels else -1)
@@ -249,7 +250,9 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
     article_id, article_label, simplification_id = accordion_value.split(":")
 
     # Load article
-    article = ArticleDatabase.get_article(int(article_id))
+    article = ArticleDatabase.get_simplification(
+        article_id=int(article_id), simplification_id=int(simplification_id)
+    )
 
     # Simplify button
     simplify_map = {

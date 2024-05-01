@@ -1,6 +1,5 @@
 import json
 import os
-import signal
 from collections import namedtuple
 from typing import List
 
@@ -9,9 +8,9 @@ import openai
 import pandas as pd
 import torch
 from datasets import Dataset
+from openai import OpenAI
 from peft import PeftConfig, PeftModel
 from torch.utils.data import DataLoader
-from tqdm import notebook as notebook_tqdm
 from tqdm import tqdm as console_tqdm
 from transformers import (
     AutoModelForCausalLM,
@@ -100,15 +99,21 @@ def connect_to_openai(openai_key: str = None):
     Args:
         openai_key (str, optional): The OpenAI key to use. If None, the key is read from the .openai_key file. Defaults to None.
 
+    Returns:
+        OpenAI: The OpenAI client.
+
     Raises:
         OpenAIKeyNotSet: If the OpenAI key is not found.
     """
-    with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "w") as f:
-        f.write(openai_key)
+    if openai_key is not None:
+        with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "w") as f:
+            f.write(openai_key)
     try:
         with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "r") as f:
             openai_key = f.read()
-            openai.api_key = openai_key
+            return OpenAI(
+                api_key=openai_key,
+            )
     except:
         raise OpenAIKeyNotSet(
             "OpenAI key not found. Please provide it in .openai_key file."
@@ -164,11 +169,7 @@ def __simplify_sentences(sentences: List[str], model: str = "mistral-7B"):
     inputs = __format_data_mistral(inputs)
 
     if "gpt-3.5-turbo-1106" in model:
-        # Connect to OpenAI
-        connect_to_openai()
-
-        # Compute predictions
-        predictions = __evaluate_openai(inputs["formatted_chat"], "davinci-codex", "")
+        predictions = evaluate_openai(inputs["formatted_chat"], model, "")
         predictions_series = predictions
     elif model == "mistral-7B":
         # Encode dataset
@@ -335,49 +336,32 @@ def __encode_dataset(dataset: Dataset, tokenizer: AutoTokenizer):
     return encoded_dataset
 
 
-class Timeout:
-    """Timeout class using ALARM signal"""
+def evaluate_openai(inputs: pd.Series, model: str, context: str):
+    # Connect to OpenAI
+    client = connect_to_openai()
 
-    class Timeout(Exception):
-        pass
-
-    def __init__(self, sec):
-        self.sec = sec
-
-    def __enter__(self):
-        signal.signal(signal.SIGALRM, self.raise_timeout)
-        signal.alarm(self.sec)
-
-    def __exit__(self, *args):
-        signal.alarm(0)  # disable alarm
-
-    def raise_timeout(self, *args):
-        raise Timeout.Timeout()
-
-
-def __evaluate_openai(inputs: pd.Series, model: str, context: str):
     # Compute predictions
     predictions = []
-    for text in notebook_tqdm.tqdm(inputs):
+    for text in console_tqdm(inputs):
         try:
-            with Timeout(15):
-                if "gpt" in model:
-                    response = openai.ChatCompletion.create(
-                        model=model,
-                        messages=[
-                            {"role": "system", "content": context},
-                            {"role": "user", "content": text},
-                        ],
-                        max_tokens=len(text) * 2,
-                    )
-                    prediction = response.choices[0]["message"]["content"].strip()
-                else:
-                    response = openai.Completion.create(
-                        engine=model,
-                        prompt=f"{context}{text}",
-                        max_tokens=len(text) * 2,
-                    )
-                    prediction = response.choices[0].text.strip()
+            if "gpt" in model:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": context},
+                        {"role": "user", "content": text},
+                    ],
+                    max_tokens=len(text) * 2,
+                )
+                prediction = response.choices[0].message.content.strip()
+            else:
+                # Todo: Update to use the new API
+                response = client.Completion.create(
+                    engine=model,
+                    prompt=f"{context}{text}",
+                    max_tokens=len(text) * 2,
+                )
+                prediction = response.choices[0].text.strip()
         except Exception as e:
             print(e)
             print(f"Error with text: {text}")
@@ -391,7 +375,7 @@ def __evaluate_openai(inputs: pd.Series, model: str, context: str):
             os.path.join(Config.pwd, "scratch", "openai_predictions.csv"), index=False
         )
 
-    return pd.DataFrame(predictions)
+    return pd.Series(predictions)
 
 
 # ---------------------------------------------------------------------------- #
