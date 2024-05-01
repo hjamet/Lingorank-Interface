@@ -1,15 +1,17 @@
 import json
-import logging
 import os
+import signal
 from collections import namedtuple
 from typing import List
 
 import nltk.data
+import openai
 import pandas as pd
 import torch
 from datasets import Dataset
 from peft import PeftConfig, PeftModel
 from torch.utils.data import DataLoader
+from tqdm import notebook as notebook_tqdm
 from tqdm import tqdm as console_tqdm
 from transformers import (
     AutoModelForCausalLM,
@@ -20,6 +22,8 @@ from transformers import (
 )
 
 import src.Config as Config
+from src.Exceptions import OpenAIKeyNotSet
+from src.Logger import logger
 
 openai_models_path = os.path.join(Config.pwd, "data", "models")
 
@@ -46,7 +50,7 @@ def compute_text_difficulty(text: str):
     ]
 
     # Compute difficulty of each sentence
-    sentence_difficulties = compute_sentences_difficulty(short_sentences)
+    sentence_difficulties = __compute_sentences_difficulty(short_sentences)
 
     # Compute average difficulty per column
     average_difficulty = [sum(col) / len(col) for col in zip(*sentence_difficulties)]
@@ -54,7 +58,69 @@ def compute_text_difficulty(text: str):
     return average_difficulty
 
 
-def compute_sentences_difficulty(sentences: List[str]):
+def simplify_text(text: str, model_to_use: str = "mistral-7B"):
+    """Simplify a text by simplifying each sentence.
+
+    Args:
+        text (str): The text to simplify, expected in French.
+        model_to_use (str, optional): The model to use for simplification. Can be either "mistral-7B" or "gpt-3.5-turbo-1106" Defaults to "mistral".
+
+    Returns:
+        str: The simplified text.
+
+    Raises:
+        OpenAIKeyNotSet: If the openai key is not found.
+    """
+    # Split by sentences
+    tokenizer = nltk.data.load("tokenizers/punkt/french.pickle")
+    sentences = tokenizer.tokenize(text)
+
+    # Compute simplified sentences
+    simplified_sentences = __simplify_sentences(sentences, model_to_use)
+
+    return " ".join(simplified_sentences)
+
+
+def list_available_models():
+    models = {}
+
+    # OpenAI models
+    for file in os.listdir(openai_models_path):
+        model_json = json.load(open(os.path.join(openai_models_path, file)))
+        models[model_json["model"]["model"]] = namedtuple(
+            "Model", ["model", "fine_tuned_model"]
+        )(model_json["model"]["model"], model_json["model"]["fine_tuned_model"])
+
+    return models
+
+
+def connect_to_openai(openai_key: str = None):
+    """Connect to OpenAI API.
+
+    Args:
+        openai_key (str, optional): The OpenAI key to use. If None, the key is read from the .openai_key file. Defaults to None.
+
+    Raises:
+        OpenAIKeyNotSet: If the OpenAI key is not found.
+    """
+    with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "w") as f:
+        f.write(openai_key)
+    try:
+        with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "r") as f:
+            openai_key = f.read()
+            openai.api_key = openai_key
+    except:
+        raise OpenAIKeyNotSet(
+            "OpenAI key not found. Please provide it in .openai_key file."
+        )
+
+
+# ---------------------------------------------------------------------------- #
+#                               PRIVATE FUNCTIONS                              #
+# ---------------------------------------------------------------------------- #
+
+
+def __compute_sentences_difficulty(sentences: List[str]):
     """Estimate the difficulty of multiple sentences in French.
 
     Args:
@@ -73,26 +139,37 @@ def compute_sentences_difficulty(sentences: List[str]):
     return results
 
 
-def simplify_sentences(sentences: List[str], model: str = "mistral-7B"):
+def __simplify_sentences(sentences: List[str], model: str = "mistral-7B"):
     """Simplify multiple sentences in French.
 
     Args:
         sentence (List[str]): A list of sentences in French.
-        model (str, optional): The model to use for simplification. Can be either "mistral-7B" or "gpt-3.5-turbo-1106" Defaults to "mistral".
+        model (str, optional): The model to use for simplification. Can be either "mistral-7B" or an openai model id. Defaults to "mistral-7B".
 
     Returns:
         List[str]: The simplified sentences.
+
+    Raises:
+        OpenAIKeyNotSet: If the openai key is not found.
     """
     # Estimate difficulty
     inputs = pd.DataFrame(columns=["Sentence", "Difficulty"])
     inputs["Sentence"] = sentences
-    inputs["Difficulty"] = pd.Series(compute_sentences_difficulty(sentences))
+    inputs["Difficulty"] = pd.Series(__compute_sentences_difficulty(sentences))
+    inputs["Difficulty"] = inputs["Difficulty"].apply(
+        lambda x: ["A1", "A2", "B1", "B2", "C1", "C2"][x.index(max(x))]
+    )
 
     # Format data
     inputs = __format_data_mistral(inputs)
 
-    if model == "gpt-3.5-turbo-1106":
-        pass
+    if "gpt-3.5-turbo-1106" in model:
+        # Connect to OpenAI
+        connect_to_openai()
+
+        # Compute predictions
+        predictions = __evaluate_openai(inputs["formatted_chat"], "davinci-codex", "")
+        predictions_series = predictions
     elif model == "mistral-7B":
         # Encode dataset
         encoded_dataset = __encode_dataset(inputs, mistral_tokenizer)
@@ -123,12 +200,9 @@ def simplify_sentences(sentences: List[str], model: str = "mistral-7B"):
             ]
             predictions_series = pd.Series(predictions)
     else:
-        raise ValueError(f"Invalid model name {model}.")
+        raise OpenAIKeyNotSet(f"Invalid model name {model}.")
 
     return predictions_series
-
-
-# ------------------------- PRIVATE MISTRAL FUNCTIONS ------------------------ #
 
 
 def __download_tokenizer(
@@ -152,7 +226,7 @@ def __format_data_mistral(
     df: pd.DataFrame,
 ):
     # Create conversation
-    logging.info("Create conversation...")
+    logger.info("Create conversation...")
 
     def create_conversation(row):
         conversation = [
@@ -186,7 +260,7 @@ def __format_data_mistral(
         return conversation
 
     # Create dataset
-    logging.info("Create dataset...")
+    logger.info("Create dataset...")
     conversation_list = (
         df.reset_index()
         .apply(create_conversation, axis=1)
@@ -196,7 +270,7 @@ def __format_data_mistral(
     dataset = Dataset.from_dict({"chat": conversation_list})
 
     # Format dataset
-    logging.info("Format dataset...")
+    logger.info("Format dataset...")
     formatted_dataset = dataset.map(
         lambda x: {
             "formatted_chat": mistral_tokenizer.apply_chat_template(
@@ -210,7 +284,7 @@ def __format_data_mistral(
 
 def __encode_dataset(dataset: Dataset, tokenizer: AutoTokenizer):
     # Determine max length
-    logging.info("Determine max length...")
+    logger.info("Determine max length...")
     max_length = max(
         [
             len(tokenizer.encode(chat))
@@ -219,7 +293,7 @@ def __encode_dataset(dataset: Dataset, tokenizer: AutoTokenizer):
     )
 
     # Encode dataset
-    logging.info("Encode dataset...")
+    logger.info("Encode dataset...")
     encoded_dataset = dataset.map(
         lambda x: tokenizer(
             x["formatted_chat"],
@@ -232,7 +306,7 @@ def __encode_dataset(dataset: Dataset, tokenizer: AutoTokenizer):
     )
 
     # Create labels
-    logging.info("Create labels...")
+    logger.info("Create labels...")
     encoded_dataset = encoded_dataset.map(
         lambda x: {
             "labels": x["input_ids"],
@@ -243,7 +317,7 @@ def __encode_dataset(dataset: Dataset, tokenizer: AutoTokenizer):
     )
 
     # Create dataset ready for training
-    logging.info("Create dataset ready for training...")
+    logger.info("Create dataset ready for training...")
     encoded_dataset = Dataset.from_dict(
         {
             "input_ids": torch.tensor(encoded_dataset["input_ids"]),
@@ -259,32 +333,6 @@ def __encode_dataset(dataset: Dataset, tokenizer: AutoTokenizer):
     )
 
     return encoded_dataset
-
-
-# ------------------------- PRIVATE OPENAI FUNCTIONS ------------------------- #
-
-import signal
-import time
-
-import openai
-import pandas as pd
-
-# ----------------------- ZERO-SHOT EVALUATION FUNCTION ---------------------- #
-from tqdm import notebook as notebook_tqdm
-
-
-# Connect to OpenAI
-def connect_to_openai():
-
-    try:
-        with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "r") as f:
-            openai_key = f.read()
-            openai.api_key = openai_key
-    except:
-        key = input("Please enter your OpenAI key: ")
-        with open(os.path.join(Config.pwd, "scratch", ".openai_key"), "w") as f:
-            f.write(key)
-        openai.api_key = key
 
 
 class Timeout:
@@ -307,7 +355,7 @@ class Timeout:
         raise Timeout.Timeout()
 
 
-def evaluate_openai(inputs: pd.Series, model: str, context: str):
+def __evaluate_openai(inputs: pd.Series, model: str, context: str):
     # Compute predictions
     predictions = []
     for text in notebook_tqdm.tqdm(inputs):
@@ -346,19 +394,6 @@ def evaluate_openai(inputs: pd.Series, model: str, context: str):
     return pd.DataFrame(predictions)
 
 
-def list_available_models():
-    models = {}
-
-    # OpenAI models
-    for file in os.listdir(openai_models_path):
-        model_json = json.load(open(os.path.join(openai_models_path, file)))
-        models[model_json["model"]["model"]] = namedtuple(
-            "Model", ["model", "fine_tuned_model"]
-        )(model_json["model"]["model"], model_json["model"]["fine_tuned_model"])
-
-    return models
-
-
 # ---------------------------------------------------------------------------- #
 #                                INITIALIZATION                                #
 # ---------------------------------------------------------------------------- #
@@ -388,7 +423,7 @@ if Config.difficulty_estimation:
     )
 
 # Load the sentence simplification model
-if Config.simplification:
+if Config.simplification_with_mistral:
     ## Add quantization
     kwargs = {
         "pretrained_model_name_or_path": "bofenghuang/vigostral-7b-chat",
@@ -410,8 +445,9 @@ if Config.simplification:
         "OloriBern/Mistral-7B-French-Simplification",
         config=config,
     )
-    ## Load Tokenizer
-    mistral_tokenizer = __download_tokenizer()
+
+## Load Tokenizer
+mistral_tokenizer = __download_tokenizer()
 
 # Load the OpenAI models
 # connect_to_openai()
@@ -427,5 +463,5 @@ if __name__ == "__main__":
         "Le chat est sur le tapis.",
         "A n'en pas douter, la voiture peut certainement être située dans le garage !",
     ]
-    print(compute_sentences_difficulty(sentence))
-    print(simplify_sentences(sentence))
+    print(__compute_sentences_difficulty(sentence))
+    print(__simplify_sentences(sentence))

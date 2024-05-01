@@ -1,4 +1,4 @@
-import logging
+from src.Logger import logger
 import os
 import re
 from io import BytesIO
@@ -30,7 +30,7 @@ def add_article_from_url(url: str):
     # Check if url not already in database
     df = pd.read_json(article_database_path)
     if not df.empty and url in df["url"].values:
-        logging.warning(f"The url {url} is already in the database.")
+        logger.warning(f"The url {url} is already in the database.")
         return
 
     # Get the page
@@ -39,7 +39,7 @@ def add_article_from_url(url: str):
             url, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True
         )
     except:
-        logging.error(f"Could not get the page at {url}")
+        logger.error(f"Could not get the page at {url}")
         return
 
     # Parse the page
@@ -58,14 +58,14 @@ def add_article_from_url(url: str):
         favor_precision=True,
     )
     if parsed is None:
-        logging.error(f"Could not parse the page at {url}")
+        logger.error(f"Could not parse the page at {url}")
         return
 
     # Get the title
     if parsed["title"] is not None:
         title = parsed["title"]
     else:
-        logging.warning(f"Could not get the title at {url}")
+        logger.warning(f"Could not get the title at {url}")
         # Default title (the domain name)
         title = url.split("//")[0]
 
@@ -76,7 +76,7 @@ def add_article_from_url(url: str):
         try:
             image = __get_largest_image_url(soup)
         except:
-            logging.warning(f"Could not get the image at {url}")
+            logger.warning(f"Could not get the image at {url}")
             # Default image
             image = "https://static.thenounproject.com/png/2684410-200.png"
 
@@ -84,7 +84,7 @@ def add_article_from_url(url: str):
     if parsed["description"] is not None:
         description = parsed["description"]
     else:
-        logging.warning(f"Could not get the description at {url}")
+        logger.warning(f"Could not get the description at {url}")
         # Default description
         description = "No description"
 
@@ -125,13 +125,13 @@ def get_article(article_id: int):
     try:
         df = pd.read_json(article_database_path)
     except:
-        logging.error("The database is corrupted or empty.")
+        logger.error("The database is corrupted or empty.")
         return
 
     try:
         return df[df["article_id"] == article_id].iloc[0].to_dict()
     except:
-        logging.error(f"The article with id {article_id} does not exist.")
+        logger.error(f"The article with id {article_id} does not exist.")
 
 
 def get_simplification(
@@ -147,12 +147,15 @@ def get_simplification(
 
     Returns:
         dict: The simplified article.
+
+    Raises:
+        OpenAIKeyNotSet (Exception): If the OpenAI key is not set.
     """
     # Load the database
     try:
         df = pd.read_json(simplication_database_path)
     except:
-        logging.warning("The database is corrupted or empty. Creating it.")
+        logger.warning("The database is corrupted or empty. Creating it.")
         df = pd.DataFrame(columns=["article_id", "text"])
 
     # Get the article
@@ -163,7 +166,7 @@ def get_simplification(
         article_simplifications = df[(df["article_id"] == article["article_id"])]
         return article_simplifications.iloc[simplification_id].to_dict()
     except:
-        logging.info(
+        logger.info(
             f"The simplification with id {simplification_id} does not exist. Creating it."
         )
         # TODO Link Simplification using model
@@ -173,7 +176,12 @@ def get_simplification(
             ].fine_tuned_model
         else:
             model_to_use = Models.list_available_models()[model_to_use].fine_tuned_model
-        text = article["text"]
+
+        text = Models.simplify_text(
+            text=article["text"],
+            model_to_use=model_to_use,
+        )
+
         difficulty_list = Models.compute_text_difficulty(text)
 
         __add_simplification(article=article, text=text, difficulty=difficulty_list)
@@ -229,7 +237,7 @@ def __add_article(
     try:
         pd.read_json(article_database_path)
     except:
-        logging.error("The database is corrupted.")
+        logger.error("The database is corrupted.")
 
     return
 
@@ -246,7 +254,7 @@ def __add_simplification(article: dict, text: str, difficulty: list):
     try:
         df = pd.read_json(simplication_database_path)
     except:
-        logging.warning("The database is corrupted or empty. Creating it.")
+        logger.warning("The database is corrupted or empty. Creating it.")
         df = pd.DataFrame(columns=["article_id", "text"])
 
     # Add the simplification
@@ -272,7 +280,7 @@ def __add_simplification(article: dict, text: str, difficulty: list):
     try:
         pd.read_json(simplication_database_path)
     except:
-        logging.error("The database is corrupted.")
+        logger.error("The database is corrupted.")
 
     return
 

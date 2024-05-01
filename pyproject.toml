@@ -30,6 +30,7 @@ openai = "^1.16.2"
 nltk = "^3.8.1"
 tokenizers = "0.19"
 trafilatura = "^1.8.1"
+colorama = "^0.4.6"
 
 
 [build-system]

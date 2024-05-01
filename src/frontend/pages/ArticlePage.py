@@ -1,18 +1,18 @@
-import logging
-
 import dash
 import dash_mantine_components as dmc
 import plotly.graph_objects as go
+from dash_iconify import DashIconify
 
 import src.backend.ArticleDatabase as ArticleDatabase
-import src.Config as Config
-from src.frontend.helpers import pages as pages
 import src.backend.Models as Models
+import src.Config as Config
+from src.Exceptions import OpenAIKeyNotSet
+from src.frontend.helpers import pages as pages
+from src.Logger import logger
 
 
 def layout(article_id):
     # TODO Add Stepper to navigate between simplifications
-
     # Check if article_id is an integer
     try:
         article_id = int(article_id)
@@ -22,8 +22,38 @@ def layout(article_id):
     # Get the article
     article = ArticleDatabase.get_article(article_id)
     if article is None:
-        logging.error(f"The article with id {article_id} does not exist.")
+        logger.error(f"The article with id {article_id} does not exist.")
         return dmc.Text(children="The article does not exist.")
+
+    # OpenAI Key Modal
+    ## OpenAI Key Input
+    openai_key_input = dmc.TextInput(
+        placeholder="Enter OpenAI API Key",
+        id="openai-key-input",
+        style={"width": "100%"},
+    )
+    ## Submit OpenAI Key Button
+    submit_openai_key_button = dmc.Button(
+        children="Submit",
+        color="blue",
+        id="submit-openai-key-button",
+    )
+    ## Create Stack for Modal
+    openai_key_modal_stack = dmc.Stack(
+        children=[openai_key_input, submit_openai_key_button],
+        spacing="xl",
+        align="flex-end",
+    )
+    ## Create Modal
+    # TODO : Improve key visual (the key seems to be incorrect etc.)
+    # TODO : Live check if the key is correct
+    openai_key_modal = dmc.Modal(
+        children=[openai_key_modal_stack],
+        title="Please provide your OpenAI API key",
+        id="openai-key-modal",
+        centered=True,
+        zIndex=10000,
+    )
 
     # Spider graph
     # TODO Add video
@@ -121,7 +151,7 @@ def layout(article_id):
 
     # Container
     layout = dmc.Container(
-        children=[article_card_graph, accordion, simplify_menu],
+        children=[article_card_graph, accordion, simplify_menu, openai_key_modal],
         id="article-layout",
         size="80%",
     )
@@ -135,14 +165,38 @@ def layout(article_id):
 
 
 def __create_accordion(article: dict, value: str):
-    # TODO Improve visual of title with badges
     # Get infos from accordion value
     article_id, article_label, simplification_id = value.split(":")
 
+    accordion_title_badge = dmc.Badge(
+        article_label, color=Config.difficulty_colors[article_label], variant="filled"
+    )
     if simplification_id == "0":
-        accordion_title = f"Original text : {article_label}"
+        accordion_title_icon = dmc.ThemeIcon(
+            size="lg",
+            color=Config.difficulty_colors[article_label],
+            variant="filled",
+            children=DashIconify(icon="carbon:document", width=25),
+        )
+        accordion_title_string = dash.html.B(f"Original text")
     else:
-        accordion_title = f"Simplification n°{simplification_id} : {article_label}"
+        # TODO Add mistral icon
+        accordion_title_icon = dmc.ThemeIcon(
+            size="lg",
+            color=Config.difficulty_colors[article_label],
+            variant="filled",
+            children=DashIconify(icon="ri:openai-fill", width=25),
+        )
+        accordion_title_string = dash.html.B(f"Simplification n°{simplification_id}")
+    accordion_title = dmc.Group(
+        [
+            accordion_title_icon,
+            accordion_title_string,
+            accordion_title_badge,
+        ],
+        position="space-around",
+        spacing="lg",
+    )
 
     # Title
     title = dmc.Title(children=article["title"], order=1)
@@ -256,60 +310,91 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
 @dash.callback(
     dash.dependencies.Output("article-accordion", "children"),
     dash.dependencies.Output("article-accordion", "value"),
+    dash.dependencies.Output("openai-key-modal", "opened"),
     dash.dependencies.Input("simplify-button", "n_clicks"),
     dash.dependencies.Input("model-button", "children"),
     dash.dependencies.Input("model-button", "n_clicks"),
+    dash.dependencies.Input("submit-openai-key-button", "n_clicks"),
     dash.dependencies.State("article-accordion", "value"),
     dash.dependencies.State("article-accordion", "children"),
+    dash.dependencies.State("openai-key-input", "value"),
     prevent_initial_call=True,
 )
 def call_simplify_text(
-    n_clicks, menu_button, menu_button_n_clicks, accordion_value, accordion_children
+    simplify_button_n_clicks,
+    model_button_children,
+    model_button_n_clicks,
+    submit_openai_key_n_clicks,
+    accordion_value,
+    accordion_children,
+    openai_key,
 ):
-    # Get infos from accordion value
-    if accordion_value is None or (n_clicks is None and menu_button_n_clicks is None):
-        return dash.no_update, dash.no_update
-    article_id, article_label, simplification_id = accordion_value.split(":")
+    if simplify_button_n_clicks is not None or model_button_n_clicks is not None:
+        # Get infos from accordion value
+        if accordion_value is None or (
+            simplify_button_n_clicks is None and model_button_n_clicks is None
+        ):
+            return dash.no_update, dash.no_update, False
+        article_id, article_label, simplification_id = accordion_value.split(":")
 
-    # Get current position in accordion
-    current_position = int(simplification_id)
-    # Return next already loaded simplification
-    if current_position + 1 < len(accordion_children):
-        return (
-            accordion_children,
-            accordion_children[current_position + 1]["props"]["value"],
-        )
-    # Create new simplification and return it
-    else:
-        # Determine the model to use
-        if n_clicks:
-            model_name = menu_button
-        else:
-            model_name = None
-
-        # Create new simplification
-        simplification = ArticleDatabase.get_simplification(
-            article_id=int(article_id),
-            simplification_id=current_position,
-            model_to_use=model_name,
-        )
-        # Update accordion
-        simplification_label = max(
-            simplification,
-            key=lambda x: (
-                simplification[x] if x in ["A1", "A2", "B1", "B2", "C1", "C2"] else -1
-            ),
-        )
-        accordion_children.append(
-            __create_accordion(
-                simplification,
-                value=f"{article_id}:{simplification_label}:{current_position+1}",
+        # Get current position in accordion
+        current_position = int(simplification_id)
+        # Return next already loaded simplification
+        if current_position + 1 < len(accordion_children):
+            return (
+                accordion_children,
+                accordion_children[current_position + 1]["props"]["value"],
+                False,
             )
-        )
-        return (
-            accordion_children,
-            f"{article_id}:{simplification_label}:{current_position+1}",
-        )
+        # Create new simplification and return it
+        else:
+            # Determine the model to use
+            if simplify_button_n_clicks:
+                model_name = model_button_children
+            else:
+                model_name = None
+
+            # Create new simplification
+            try:
+                simplification = ArticleDatabase.get_simplification(
+                    article_id=int(article_id),
+                    simplification_id=current_position,
+                    model_to_use=model_name,
+                )
+            except OpenAIKeyNotSet as e:
+                logger.warning(e)
+                return (
+                    accordion_children,
+                    accordion_children[current_position]["props"]["value"],
+                    True,
+                )
+            # Update accordion
+            simplification_label = max(
+                simplification,
+                key=lambda x: (
+                    simplification[x]
+                    if x in ["A1", "A2", "B1", "B2", "C1", "C2"]
+                    else -1
+                ),
+            )
+            accordion_children.append(
+                __create_accordion(
+                    simplification,
+                    value=f"{article_id}:{simplification_label}:{current_position+1}",
+                )
+            )
+            return (
+                accordion_children,
+                f"{article_id}:{simplification_label}:{current_position+1}",
+                False,
+            )
+    elif submit_openai_key_n_clicks is not None:
+        if openai_key is not None:
+            Models.connect_to_openai(openai_key)
+        return dash.no_update, dash.no_update, False
+    else:
+        logger.error("No button was clicked.")
+        return dash.no_update, dash.no_update, dash.no_update
 
 
 # ---------------------------------------------------------------------------- #

@@ -10,7 +10,7 @@ port = 5000
 
 # ---------------------------------- MODELS ---------------------------------- #
 difficulty_estimation = True
-simplification = False
+simplification_with_mistral = False
 quantization = False
 
 # --------------------------------- INTERFACE -------------------------------- #
@@ -22,6 +22,9 @@ difficulty_colors = {
     "C1": "orange",
     "C2": "red",
 }
+
+# ----------------------------------- DEBUG ---------------------------------- #
+log_level = "DEBUG"
 
 # ---------------------------------------------------------------------------- #
 #                                    STATIC                                    #
