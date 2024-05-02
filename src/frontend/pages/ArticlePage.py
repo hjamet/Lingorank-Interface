@@ -129,9 +129,43 @@ def layout(article_id):
         style={"marginTop": "3rem", "marginBottom": "3rem"},
     )
 
+    # Simplification Skeleton & Progress Bar
+    simplification_progress_bar = dmc.Progress(
+        radius="xl",
+        size="xl",
+        animate=True,
+        color="lime",
+        id="simplification-progress-bar",
+    )
+    small_space = dmc.Space(h="xl")
+    simplification_skeleton = dmc.Stack(
+        children=[
+            dmc.Skeleton(h=50, mb="xl"),
+            dmc.Skeleton(h=8, radius="xl"),
+            dmc.Skeleton(h=8, my=6),
+            dmc.Skeleton(h=8, w="85%", radius="xl"),
+            dmc.Skeleton(h=50, mb="xl"),
+            dmc.Skeleton(h=8, radius="xl"),
+            dmc.Skeleton(h=8, my=6),
+            dmc.Skeleton(h=8, w="65%", radius="xl"),
+        ],
+    )
+    simplification_in_progress = dmc.Stack(
+        children=[simplification_progress_bar, small_space, simplification_skeleton],
+        align="center",
+        style={"display": "none"},
+        id="simplification-in-progress",
+    )
+
     # Container
     layout = dmc.Container(
-        children=[article_card_graph, accordion, simplify_menu, openai_key_modal],
+        children=[
+            article_card_graph,
+            accordion,
+            simplification_in_progress,
+            simplify_menu,
+            openai_key_modal,
+        ],
         id="article-layout",
         size="80%",
     )
@@ -233,7 +267,7 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
         article = ArticleDatabase.get_article(int(article_id))
     else:
         article = ArticleDatabase.get_simplification(
-            article_id=int(article_id), simplification_id=int(simplification_id)
+            article_id=int(article_id), simplification_id=int(simplification_id) - 1
         )
 
     # Simplify button
@@ -292,6 +326,7 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
     return article_card_graph_children, simplify_button
 
 
+# TODO https://dash.plotly.com/background-callbacks#example-4:-progress-bar
 @dash.callback(
     dash.dependencies.Output("article-accordion", "children"),
     dash.dependencies.Output("article-accordion", "value"),
@@ -304,8 +339,21 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
     dash.dependencies.State("article-accordion", "children"),
     dash.dependencies.State("openai-key-input", "value"),
     prevent_initial_call=True,
+    background=True,
+    running=[
+        (dash.dependencies.Output("simplify-button", "disabled"), True, False),
+        (
+            dash.dependencies.Output("simplification-in-progress", "style"),
+            {"display": "block"},
+            {"display": "none"},
+        ),
+    ],
+    progress=[
+        dash.dependencies.Output("simplification-progress-bar", "value"),
+    ],
 )
 def call_simplify_text(
+    set_progress,
     simplify_button_n_clicks,
     model_button_children,
     model_button_n_clicks,
@@ -345,6 +393,7 @@ def call_simplify_text(
                     article_id=int(article_id),
                     simplification_id=current_position,
                     model_to_use=model_name,
+                    set_progress=set_progress,
                 )
             except OpenAIKeyNotSet as e:
                 logger.warning(e)

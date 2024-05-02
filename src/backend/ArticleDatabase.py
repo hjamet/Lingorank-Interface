@@ -135,7 +135,7 @@ def get_article(article_id: int):
 
 
 def get_simplification(
-    article_id: int, simplification_id: int, model_to_use: str = None
+    article_id: int, simplification_id: int, model_to_use: str = None, set_progress=None
 ):
     """Get a simplification version of the article.
 
@@ -144,6 +144,7 @@ def get_simplification(
         simplification_id (int): The id of the simplification. (The higher the id, the more simplified the text)
         model_to_use (str): The model to use for the simplification. Default is None. Possible values:
             - "model id" (str): for openai models
+        set_progress (function): A function to set the progress of the simplification. Default is None.
 
     Returns:
         dict: The simplified article.
@@ -170,7 +171,7 @@ def get_simplification(
             f"The simplification with id {simplification_id} does not exist. Creating it."
         )
         # TODO Link Simplification using model
-        if model_to_use is not None:
+        if model_to_use is None:
             model_to_use = list(Models.list_available_models().values())[
                 0
             ].fine_tuned_model
@@ -180,6 +181,7 @@ def get_simplification(
         text = Models.simplify_text(
             text=article["text"],
             model_to_use=model_to_use,
+            set_progress=set_progress,
         )
 
         difficulty_list = Models.compute_text_difficulty(text)

@@ -57,12 +57,13 @@ def compute_text_difficulty(text: str):
     return average_difficulty
 
 
-def simplify_text(text: str, model_to_use: str = "mistral-7B"):
+def simplify_text(text: str, model_to_use: str = "mistral-7B", set_progress=None):
     """Simplify a text by simplifying each sentence.
 
     Args:
         text (str): The text to simplify, expected in French.
         model_to_use (str, optional): The model to use for simplification. Can be either "mistral-7B" or "gpt-3.5-turbo-1106" Defaults to "mistral".
+        set_progress (function, optional): A function to set the progress. Defaults to None.
 
     Returns:
         str: The simplified text.
@@ -75,7 +76,9 @@ def simplify_text(text: str, model_to_use: str = "mistral-7B"):
     sentences = tokenizer.tokenize(text)
 
     # Compute simplified sentences
-    simplified_sentences = __simplify_sentences(sentences, model_to_use)
+    simplified_sentences = simplify_sentences(
+        sentences, model_to_use, set_progress=set_progress
+    )
 
     return " ".join(simplified_sentences)
 
@@ -144,12 +147,15 @@ def __compute_sentences_difficulty(sentences: List[str]):
     return results
 
 
-def __simplify_sentences(sentences: List[str], model: str = "mistral-7B"):
+def simplify_sentences(
+    sentences: List[str], model: str = "mistral-7B", set_progress=None
+):
     """Simplify multiple sentences in French.
 
     Args:
         sentence (List[str]): A list of sentences in French.
         model (str, optional): The model to use for simplification. Can be either "mistral-7B" or an openai model id. Defaults to "mistral-7B".
+        set_progress (function, optional): A function to set the progress. Defaults to None.
 
     Returns:
         List[str]: The simplified sentences.
@@ -169,7 +175,9 @@ def __simplify_sentences(sentences: List[str], model: str = "mistral-7B"):
     inputs = __format_data_mistral(inputs)
 
     if "gpt-3.5-turbo-1106" in model:
-        predictions = evaluate_openai(inputs["formatted_chat"], model, "")
+        predictions = evaluate_openai(
+            inputs["formatted_chat"], model, "", set_progress=set_progress
+        )
         predictions_series = predictions
     elif model == "mistral-7B":
         # Encode dataset
@@ -336,13 +344,16 @@ def __encode_dataset(dataset: Dataset, tokenizer: AutoTokenizer):
     return encoded_dataset
 
 
-def evaluate_openai(inputs: pd.Series, model: str, context: str):
+def evaluate_openai(inputs: pd.Series, model: str, context: str, set_progress=None):
     # Connect to OpenAI
     client = connect_to_openai()
 
     # Compute predictions
     predictions = []
-    for text in console_tqdm(inputs):
+    for i, text in enumerate(console_tqdm(inputs)):
+        # Update dash progress bar
+        if set_progress is not None:
+            set_progress((round(100 * i / len(inputs)) if len(inputs) != 0 else 0))
         try:
             if "gpt" in model:
                 response = client.chat.completions.create(
@@ -448,4 +459,4 @@ if __name__ == "__main__":
         "A n'en pas douter, la voiture peut certainement être située dans le garage !",
     ]
     print(__compute_sentences_difficulty(sentence))
-    print(__simplify_sentences(sentence))
+    print(simplify_sentences(sentence))
