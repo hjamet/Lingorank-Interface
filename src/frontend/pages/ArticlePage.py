@@ -75,8 +75,33 @@ def layout(article_id):
         ],
         cols=2,
         spacing="xl",
-        style={"marginTop": "5rem", "marginBottom": "5rem"},
+        style={"marginTop": "3rem", "marginBottom": "3rem"},
         id="article-card-graph",
+    )
+
+    # Stepper
+    # TODO : Finish stepper
+    stepper = dmc.Stepper(
+        id="stepper-basic-usage",
+        active=1,
+        children=[
+            dmc.StepperStep(
+                label="Original text",
+                description="This text is B2 level",
+                children=dmc.Text("Original text", ta="center"),
+            ),
+            dmc.StepperStep(
+                label="First simplification",
+                description="This simplification is A2 level",
+                children=dmc.Text("Simplified text", ta="center"),
+            ),
+            dmc.StepperStep(
+                label="Second simplification",
+                description="This simplification is A1 level",
+                children=dmc.Text("Simplified text", ta="center"),
+            ),
+        ],
+        style={"marginTop": "3rem", "marginBottom": "3rem"},
     )
 
     # Accordion
@@ -131,13 +156,13 @@ def layout(article_id):
 
     # Simplification Skeleton & Progress Bar
     simplification_progress_bar = dmc.Progress(
-        radius="xl",
-        size="xl",
+        radius="sm",
+        size="lg",
         animate=True,
-        color="lime",
+        color="cyan",
         id="simplification-progress-bar",
+        style={"marginTop": "3rem", "marginBottom": "3rem"},
     )
-    small_space = dmc.Space(h="xl")
     simplification_skeleton = dmc.Stack(
         children=[
             dmc.Skeleton(h=50, mb="xl"),
@@ -151,7 +176,7 @@ def layout(article_id):
         ],
     )
     simplification_in_progress = dmc.Stack(
-        children=[simplification_progress_bar, small_space, simplification_skeleton],
+        children=[simplification_progress_bar, simplification_skeleton],
         align="center",
         style={"display": "none"},
         id="simplification-in-progress",
@@ -161,6 +186,7 @@ def layout(article_id):
     layout = dmc.Container(
         children=[
             article_card_graph,
+            stepper,
             accordion,
             simplification_in_progress,
             simplify_menu,
@@ -326,15 +352,14 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
     return article_card_graph_children, simplify_button
 
 
-# TODO https://dash.plotly.com/background-callbacks#example-4:-progress-bar
 @dash.callback(
     dash.dependencies.Output("article-accordion", "children"),
     dash.dependencies.Output("article-accordion", "value"),
     dash.dependencies.Output("openai-key-modal", "opened"),
     dash.dependencies.Input("simplify-button", "n_clicks"),
-    dash.dependencies.Input("model-button", "children"),
     dash.dependencies.Input("model-button", "n_clicks"),
     dash.dependencies.Input("submit-openai-key-button", "n_clicks"),
+    dash.dependencies.State("model-button", "children"),
     dash.dependencies.State("article-accordion", "value"),
     dash.dependencies.State("article-accordion", "children"),
     dash.dependencies.State("openai-key-input", "value"),
@@ -342,6 +367,7 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
     background=True,
     running=[
         (dash.dependencies.Output("simplify-button", "disabled"), True, False),
+        (dash.dependencies.Output("model-button", "disabled"), True, False),
         (
             dash.dependencies.Output("simplification-in-progress", "style"),
             {"display": "block"},
@@ -355,9 +381,9 @@ def call_update_graph(accordion_value: str, article_card_graph_children):
 def call_simplify_text(
     set_progress,
     simplify_button_n_clicks,
-    model_button_children,
     model_button_n_clicks,
     submit_openai_key_n_clicks,
+    model_button_children,
     accordion_value,
     accordion_children,
     openai_key,
